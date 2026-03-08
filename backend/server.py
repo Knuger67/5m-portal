@@ -70,6 +70,7 @@ class SiteSettings(BaseModel):
     discord_invite: str = ""
     max_players: int = 64
     primary_color: str = "#39FF14"
+    language: str = "en"  # en or sv
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class QueueEntry(BaseModel):
@@ -141,6 +142,7 @@ class SiteSettingsUpdate(BaseModel):
     discord_invite: Optional[str] = None
     max_players: Optional[int] = None
     primary_color: Optional[str] = None
+    language: Optional[str] = None
 
 class BanUserRequest(BaseModel):
     reason: str

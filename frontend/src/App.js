@@ -5,12 +5,311 @@ import { Toaster, toast } from 'sonner';
 import { 
   Users, Clock, Shield, Briefcase, LogOut, Menu, X, ChevronRight, 
   CheckCircle, XCircle, AlertCircle, Crown, Server, Gamepad2,
-  FileText, User, Settings, Home as HomeIcon
+  FileText, User, Settings, Home as HomeIcon, Globe
 } from 'lucide-react';
 import "@/App.css";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// ==================== TRANSLATIONS ====================
+const translations = {
+  en: {
+    // Navigation
+    home: 'Home',
+    queue: 'Queue',
+    apply: 'Apply',
+    dashboard: 'Dashboard',
+    admin: 'Admin',
+    dev: 'Dev',
+    loginWithSteam: 'Login with Steam',
+    logout: 'Logout',
+    
+    // Home Page
+    serverOnline: 'Server Online',
+    serverOffline: 'Server Offline',
+    playersOnline: 'Players Online',
+    inQueue: 'In Queue',
+    pendingApps: 'Pending Apps',
+    totalMembers: 'Total Members',
+    loginToStart: 'Login with Steam to Start',
+    joinQueue: 'Join Queue',
+    applyNow: 'Apply Now',
+    howItWorks: 'How It Works',
+    applyForWhitelist: 'Apply for Whitelist',
+    applyForWhitelistDesc: 'Submit your application with character backstory and RP experience.',
+    joinTheQueue: 'Join the Queue',
+    joinTheQueueDesc: 'Once approved, join the queue with priority based on VIP status.',
+    startPlaying: 'Start Playing',
+    startPlayingDesc: 'Connect to the server when your turn comes and enjoy the RP!',
+    
+    // Queue Page
+    serverQueue: 'Server Queue',
+    loginToJoinQueue: 'Login with Steam to join the queue',
+    notInQueue: "You're not in the queue",
+    yourPosition: 'Your Position',
+    estMinutes: 'Est. Minutes',
+    priority: 'Priority',
+    leaveQueue: 'Leave Queue',
+    currentQueue: 'Current Queue',
+    queueEmpty: 'Queue is empty',
+    
+    // Apply Page
+    submitApplication: 'Submit Application',
+    whitelist: 'Whitelist',
+    jobApplication: 'Job Application',
+    jobType: 'Job Type',
+    selectJob: 'Select a job...',
+    police: 'Police Department',
+    ems: 'Emergency Medical Services',
+    mechanic: 'Mechanic',
+    taxi: 'Taxi Driver',
+    lawyer: 'Lawyer',
+    realEstate: 'Real Estate Agent',
+    discordUsername: 'Discord Username',
+    inGameHours: 'In-Game Hours',
+    roleplayExperience: 'Roleplay Experience',
+    characterBackstory: 'Character Backstory',
+    whyJoin: 'Why Do You Want to Join?',
+    previousServers: 'Previous Servers (Optional)',
+    submitApplicationBtn: 'Submit Application',
+    loginToApply: 'Login with Steam to submit your application',
+    
+    // Dashboard
+    welcome: 'Welcome',
+    profile: 'Profile',
+    queueStatus: 'Queue Status',
+    viewQueue: 'View Queue',
+    myApplications: 'My Applications',
+    newApplication: 'New Application',
+    noApplications: 'No applications yet',
+    submitted: 'Submitted',
+    adminNotes: 'Admin Notes',
+    approved: 'Approved',
+    denied: 'Denied',
+    pending: 'Pending',
+    
+    // Admin
+    adminPanel: 'Admin Panel',
+    applications: 'Applications',
+    userManagement: 'User Management',
+    queueManagement: 'Queue Management',
+    approve: 'Approve',
+    deny: 'Deny',
+    ban: 'Ban',
+    unban: 'Unban',
+    more: 'More',
+    addWarning: 'Add Warning',
+    clearWarnings: 'Clear Warnings',
+    warningHistory: 'Warning History',
+    blockApplications: 'Block Applications',
+    blockWhitelist: 'Block Whitelist',
+    unblockWhitelist: 'Unblock Whitelist',
+    blockJobs: 'Block Jobs',
+    unblockJobs: 'Unblock Jobs',
+    banReason: 'Ban Reason',
+    banUser: 'Ban User',
+    confirmBan: 'Confirm Ban',
+    cancel: 'Cancel',
+    permanent: 'Permanent',
+    
+    // Developer
+    developerConsole: 'Developer Console',
+    supremeAccess: 'Supreme access granted',
+    siteSettings: 'Site Settings',
+    userRoles: 'User Roles',
+    dangerZone: 'Danger Zone',
+    siteConfiguration: 'Site Configuration',
+    siteName: 'Site Name (Navigation)',
+    serverName: 'Server Name',
+    heroTitle: 'Hero Title (Main Heading)',
+    heroSubtitle: 'Hero Subtitle',
+    serverConnection: 'Server Connection',
+    serverIP: 'FiveM Server IP',
+    serverPort: 'Server Port',
+    maxPlayers: 'Max Players',
+    discordInvite: 'Discord Invite Link',
+    primaryColor: 'Primary Color (Hex)',
+    saveSettings: 'Save Settings',
+    language: 'Language',
+    clearEntireQueue: 'Clear Entire Queue',
+    dangerWarning: 'These actions are irreversible. Use with caution.',
+    developerAccess: 'Developer Access',
+    enterSecretCode: 'Enter the secret code to claim developer status',
+    claimDeveloperAccess: 'Claim Developer Access',
+  },
+  sv: {
+    // Navigation
+    home: 'Hem',
+    queue: 'Kö',
+    apply: 'Ansök',
+    dashboard: 'Kontrollpanel',
+    admin: 'Admin',
+    dev: 'Dev',
+    loginWithSteam: 'Logga in med Steam',
+    logout: 'Logga ut',
+    
+    // Home Page
+    serverOnline: 'Server Online',
+    serverOffline: 'Server Offline',
+    playersOnline: 'Spelare Online',
+    inQueue: 'I Kö',
+    pendingApps: 'Väntande Ansökningar',
+    totalMembers: 'Totala Medlemmar',
+    loginToStart: 'Logga in med Steam för att börja',
+    joinQueue: 'Gå med i Kön',
+    applyNow: 'Ansök Nu',
+    howItWorks: 'Hur Det Fungerar',
+    applyForWhitelist: 'Ansök om Whitelist',
+    applyForWhitelistDesc: 'Skicka in din ansökan med karaktärsbakgrund och RP-erfarenhet.',
+    joinTheQueue: 'Gå Med i Kön',
+    joinTheQueueDesc: 'När du är godkänd, gå med i kön med prioritet baserad på VIP-status.',
+    startPlaying: 'Börja Spela',
+    startPlayingDesc: 'Anslut till servern när din tur kommer och njut av RP!',
+    
+    // Queue Page
+    serverQueue: 'Serverkö',
+    loginToJoinQueue: 'Logga in med Steam för att gå med i kön',
+    notInQueue: 'Du är inte i kön',
+    yourPosition: 'Din Position',
+    estMinutes: 'Ber. Minuter',
+    priority: 'Prioritet',
+    leaveQueue: 'Lämna Kön',
+    currentQueue: 'Aktuell Kö',
+    queueEmpty: 'Kön är tom',
+    
+    // Apply Page
+    submitApplication: 'Skicka Ansökan',
+    whitelist: 'Whitelist',
+    jobApplication: 'Jobbansökan',
+    jobType: 'Jobbtyp',
+    selectJob: 'Välj ett jobb...',
+    police: 'Polisen',
+    ems: 'Ambulans',
+    mechanic: 'Mekaniker',
+    taxi: 'Taxichaufför',
+    lawyer: 'Advokat',
+    realEstate: 'Fastighetsmäklare',
+    discordUsername: 'Discord Användarnamn',
+    inGameHours: 'Timmar i Spelet',
+    roleplayExperience: 'Rollspelserfarenhet',
+    characterBackstory: 'Karaktärsbakgrund',
+    whyJoin: 'Varför Vill Du Gå Med?',
+    previousServers: 'Tidigare Servrar (Valfritt)',
+    submitApplicationBtn: 'Skicka Ansökan',
+    loginToApply: 'Logga in med Steam för att skicka din ansökan',
+    
+    // Dashboard
+    welcome: 'Välkommen',
+    profile: 'Profil',
+    queueStatus: 'Köstatus',
+    viewQueue: 'Visa Kö',
+    myApplications: 'Mina Ansökningar',
+    newApplication: 'Ny Ansökan',
+    noApplications: 'Inga ansökningar ännu',
+    submitted: 'Skickad',
+    adminNotes: 'Adminanteckningar',
+    approved: 'Godkänd',
+    denied: 'Nekad',
+    pending: 'Väntande',
+    
+    // Admin
+    adminPanel: 'Adminpanel',
+    applications: 'Ansökningar',
+    userManagement: 'Användarhantering',
+    queueManagement: 'Köhantering',
+    approve: 'Godkänn',
+    deny: 'Neka',
+    ban: 'Banna',
+    unban: 'Avbanna',
+    more: 'Mer',
+    addWarning: 'Lägg till Varning',
+    clearWarnings: 'Rensa Varningar',
+    warningHistory: 'Varningshistorik',
+    blockApplications: 'Blockera Ansökningar',
+    blockWhitelist: 'Blockera Whitelist',
+    unblockWhitelist: 'Avblockera Whitelist',
+    blockJobs: 'Blockera Jobb',
+    unblockJobs: 'Avblockera Jobb',
+    banReason: 'Anledning till Bann',
+    banUser: 'Banna Användare',
+    confirmBan: 'Bekräfta Bann',
+    cancel: 'Avbryt',
+    permanent: 'Permanent',
+    
+    // Developer
+    developerConsole: 'Utvecklarkonsol',
+    supremeAccess: 'Högsta behörighet beviljad',
+    siteSettings: 'Webbplatsinställningar',
+    userRoles: 'Användarroller',
+    dangerZone: 'Farozon',
+    siteConfiguration: 'Webbplatskonfiguration',
+    siteName: 'Webbplatsnamn (Navigation)',
+    serverName: 'Servernamn',
+    heroTitle: 'Huvudtitel',
+    heroSubtitle: 'Underrubrik',
+    serverConnection: 'Serveranslutning',
+    serverIP: 'FiveM Server IP',
+    serverPort: 'Serverport',
+    maxPlayers: 'Max Spelare',
+    discordInvite: 'Discord Inbjudningslänk',
+    primaryColor: 'Primär Färg (Hex)',
+    saveSettings: 'Spara Inställningar',
+    language: 'Språk',
+    clearEntireQueue: 'Rensa Hela Kön',
+    dangerWarning: 'Dessa åtgärder är oåterkalleliga. Använd med försiktighet.',
+    developerAccess: 'Utvecklaråtkomst',
+    enterSecretCode: 'Ange den hemliga koden för att få utvecklarstatus',
+    claimDeveloperAccess: 'Hämta Utvecklaråtkomst',
+  }
+};
+
+// ==================== SETTINGS CONTEXT ====================
+const SettingsContext = createContext(null);
+
+export const useSettings = () => useContext(SettingsContext);
+
+const SettingsProvider = ({ children }) => {
+  const [settings, setSettings] = useState({
+    site_name: 'FIVEM PORTAL',
+    server_name: 'FiveM Roleplay Server',
+    hero_title: 'FIVEM ROLEPLAY',
+    hero_subtitle: 'Join the ultimate GTA V roleplay experience.',
+    language: 'en',
+    primary_color: '#39FF14'
+  });
+  const [loading, setLoading] = useState(true);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/settings`);
+      setSettings(res.data);
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const t = (key) => {
+    const lang = settings.language || 'en';
+    return translations[lang]?.[key] || translations['en'][key] || key;
+  };
+
+  const refreshSettings = () => {
+    fetchSettings();
+  };
+
+  return (
+    <SettingsContext.Provider value={{ settings, loading, t, refreshSettings }}>
+      {children}
+    </SettingsContext.Provider>
+  );
+};
 
 // ==================== AUTH CONTEXT ====================
 const AuthContext = createContext(null);
@@ -98,16 +397,17 @@ const AuthCallback = () => {
 // ==================== LAYOUT ====================
 const Layout = ({ children }) => {
   const { user, logout, login } = useAuth();
+  const { settings, t } = useSettings();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Home', icon: HomeIcon },
-    { path: '/queue', label: 'Queue', icon: Users },
-    { path: '/apply', label: 'Apply', icon: FileText },
-    ...(user ? [{ path: '/dashboard', label: 'Dashboard', icon: User }] : []),
-    ...(user?.is_admin || user?.is_developer ? [{ path: '/admin', label: 'Admin', icon: Shield }] : []),
-    ...(user?.is_developer ? [{ path: '/developer', label: 'Dev', icon: Settings }] : []),
+    { path: '/', label: t('home'), icon: HomeIcon },
+    { path: '/queue', label: t('queue'), icon: Users },
+    { path: '/apply', label: t('apply'), icon: FileText },
+    ...(user ? [{ path: '/dashboard', label: t('dashboard'), icon: User }] : []),
+    ...(user?.is_admin || user?.is_developer ? [{ path: '/admin', label: t('admin'), icon: Shield }] : []),
+    ...(user?.is_developer ? [{ path: '/developer', label: t('dev'), icon: Settings }] : []),
   ];
 
   return (
@@ -123,7 +423,7 @@ const Layout = ({ children }) => {
             {/* Logo */}
             <Link to="/" className="flex items-center gap-3">
               <Gamepad2 className="w-8 h-8 text-[#39FF14]" />
-              <span className="text-xl font-bold text-white tracking-wider hidden sm:block">FIVEM PORTAL</span>
+              <span className="text-xl font-bold text-white tracking-wider hidden sm:block">{settings.site_name || 'FIVEM PORTAL'}</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -160,6 +460,7 @@ const Layout = ({ children }) => {
                     onClick={logout}
                     className="p-2 text-gray-400 hover:text-[#FF003C] transition-colors"
                     data-testid="logout-btn"
+                    title={t('logout')}
                   >
                     <LogOut className="w-5 h-5" />
                   </button>
@@ -173,7 +474,7 @@ const Layout = ({ children }) => {
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3l-.5 3H13v6.95c5.05-.5 9-4.76 9-9.95 0-5.52-4.48-10-10-10z"/>
                   </svg>
-                  Login with Steam
+                  {t('loginWithSteam')}
                 </button>
               )}
 
@@ -224,21 +525,19 @@ const Layout = ({ children }) => {
 // ==================== HOME PAGE ====================
 const Home = () => {
   const { user, login } = useAuth();
+  const { settings, t } = useSettings();
   const [stats, setStats] = useState(null);
   const [serverStatus, setServerStatus] = useState(null);
-  const [settings, setSettings] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, statusRes, settingsRes] = await Promise.all([
+        const [statsRes, statusRes] = await Promise.all([
           axios.get(`${API}/stats`),
-          axios.get(`${API}/server/status`),
-          axios.get(`${API}/settings`)
+          axios.get(`${API}/server/status`)
         ]);
         setStats(statsRes.data);
         setServerStatus(statusRes.data);
-        setSettings(settingsRes.data || {});
       } catch (error) {
         console.error('Failed to fetch data:', error);
       }
@@ -247,7 +546,7 @@ const Home = () => {
   }, []);
 
   const heroTitle = settings.hero_title || 'FIVEM ROLEPLAY';
-  const heroSubtitle = settings.hero_subtitle || 'Join the ultimate GTA V roleplay experience. Apply for whitelist, queue to join, and become part of our community.';
+  const heroSubtitle = settings.hero_subtitle || t('loginToStart');
 
   return (
     <div className="relative">
@@ -267,7 +566,7 @@ const Home = () => {
           <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 border border-[#39FF14]/30 bg-black/50 backdrop-blur">
             <span className={`w-2 h-2 rounded-full ${serverStatus?.online ? 'bg-[#39FF14] animate-pulse' : 'bg-[#FF003C]'}`}></span>
             <span className="text-sm font-mono uppercase tracking-wider text-gray-300">
-              {serverStatus?.online ? 'Server Online' : 'Server Offline'}
+              {serverStatus?.online ? t('serverOnline') : t('serverOffline')}
             </span>
           </div>
 
@@ -286,19 +585,19 @@ const Home = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             <div className="glass p-4">
               <div className="text-3xl font-bold text-[#39FF14] font-mono">{stats?.players_online || 0}/{stats?.max_players || 64}</div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">Players Online</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">{t('playersOnline')}</div>
             </div>
             <div className="glass p-4">
               <div className="text-3xl font-bold text-[#00F0FF] font-mono">{stats?.queue_length || 0}</div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">In Queue</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">{t('inQueue')}</div>
             </div>
             <div className="glass p-4">
               <div className="text-3xl font-bold text-[#FAFF00] font-mono">{stats?.pending_applications || 0}</div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">Pending Apps</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">{t('pendingApps')}</div>
             </div>
             <div className="glass p-4">
               <div className="text-3xl font-bold text-white font-mono">{stats?.total_users || 0}</div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">Total Members</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">{t('totalMembers')}</div>
             </div>
           </div>
 
@@ -312,7 +611,7 @@ const Home = () => {
                   data-testid="join-queue-cta"
                 >
                   <Users className="w-5 h-5" />
-                  Join Queue
+                  {t('joinQueue')}
                 </Link>
                 <Link 
                   to="/apply" 
@@ -320,7 +619,7 @@ const Home = () => {
                   data-testid="apply-cta"
                 >
                   <FileText className="w-5 h-5" />
-                  Apply Now
+                  {t('applyNow')}
                 </Link>
               </>
             ) : (
@@ -332,7 +631,7 @@ const Home = () => {
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2C6.48 2 2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3l-.5 3H13v6.95c5.05-.5 9-4.76 9-9.95 0-5.52-4.48-10-10-10z"/>
                 </svg>
-                Login with Steam to Start
+                {t('loginToStart')}
               </button>
             )}
           </div>
@@ -343,14 +642,14 @@ const Home = () => {
       <section className="py-20 px-4 bg-[#050505]">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl sm:text-4xl font-bold text-white text-center uppercase tracking-tight mb-12">
-            How It <span className="text-[#39FF14]">Works</span>
+            {t('howItWorks').split(' ').slice(0, -1).join(' ')} <span className="text-[#39FF14]">{t('howItWorks').split(' ').slice(-1)}</span>
           </h2>
           
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { icon: Shield, title: 'Apply for Whitelist', desc: 'Submit your application with character backstory and RP experience.' },
-              { icon: Users, title: 'Join the Queue', desc: 'Once approved, join the queue with priority based on VIP status.' },
-              { icon: Gamepad2, title: 'Start Playing', desc: 'Connect to the server when your turn comes and enjoy the RP!' }
+              { icon: Shield, title: t('applyForWhitelist'), desc: t('applyForWhitelistDesc') },
+              { icon: Users, title: t('joinTheQueue'), desc: t('joinTheQueueDesc') },
+              { icon: Gamepad2, title: t('startPlaying'), desc: t('startPlayingDesc') }
             ].map((feature, idx) => (
               <div key={idx} className="glass p-6 card-hover group">
                 <div className="w-12 h-12 flex items-center justify-center bg-[#39FF14]/10 border border-[#39FF14]/30 mb-4 group-hover:bg-[#39FF14]/20 transition-colors">
@@ -1463,6 +1762,7 @@ const AdminPage = () => {
 // ==================== DEVELOPER PAGE ====================
 const DeveloperPage = () => {
   const { user, token } = useAuth();
+  const { settings: globalSettings, t, refreshSettings } = useSettings();
   const [secretCode, setSecretCode] = useState('');
   const [devStats, setDevStats] = useState(null);
   const [users, setUsers] = useState([]);
@@ -1511,12 +1811,25 @@ const DeveloperPage = () => {
     setLoading(true);
     try {
       await axios.put(`${API}/developer/settings?authorization=${token}`, settings);
-      toast.success('Settings updated! Refresh to see changes.');
+      toast.success('Settings updated!');
+      refreshSettings(); // Refresh global settings
       fetchDevData();
     } catch (error) {
       toast.error('Failed to update settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleLanguage = async () => {
+    const newLang = settings.language === 'en' ? 'sv' : 'en';
+    setSettings({...settings, language: newLang});
+    try {
+      await axios.put(`${API}/developer/settings?authorization=${token}`, { language: newLang });
+      toast.success(newLang === 'sv' ? 'Språk ändrat till Svenska!' : 'Language changed to English!');
+      refreshSettings();
+    } catch (error) {
+      toast.error('Failed to change language');
     }
   };
 
@@ -1564,8 +1877,8 @@ const DeveloperPage = () => {
         <div className="max-w-md mx-auto glass p-8">
           <div className="text-center mb-6">
             <Settings className="w-16 h-16 text-[#FF003C] mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-white uppercase tracking-tight">Developer Access</h1>
-            <p className="text-gray-400 mt-2">Enter the secret code to claim developer status</p>
+            <h1 className="text-3xl font-bold text-white uppercase tracking-tight">{t('developerAccess')}</h1>
+            <p className="text-gray-400 mt-2">{t('enterSecretCode')}</p>
           </div>
           <form onSubmit={claimDeveloper} className="space-y-4">
             <input
@@ -1582,7 +1895,7 @@ const DeveloperPage = () => {
               className="w-full py-4 bg-[#FF003C] text-white font-bold uppercase tracking-wider hover:bg-[#cc0030] transition-colors disabled:opacity-50"
               data-testid="claim-dev-btn"
             >
-              {loading ? 'Verifying...' : 'Claim Developer Access'}
+              {loading ? 'Verifying...' : t('claimDeveloperAccess')}
             </button>
           </form>
         </div>
@@ -1594,22 +1907,34 @@ const DeveloperPage = () => {
   return (
     <div className="min-h-screen pt-8 pb-20 px-4" data-testid="developer-panel">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <Settings className="w-10 h-10 text-[#FF003C]" />
-          <div>
-            <h1 className="text-4xl font-bold text-white uppercase tracking-tight">
-              Developer <span className="text-[#FF003C]">Console</span>
-            </h1>
-            <p className="text-gray-500 font-mono">Supreme access granted</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Settings className="w-10 h-10 text-[#FF003C]" />
+            <div>
+              <h1 className="text-4xl font-bold text-white uppercase tracking-tight">
+                {t('developerConsole').split(' ')[0]} <span className="text-[#FF003C]">{t('developerConsole').split(' ')[1] || 'Console'}</span>
+              </h1>
+              <p className="text-gray-500 font-mono">{t('supremeAccess')}</p>
+            </div>
           </div>
+          
+          {/* Language Toggle */}
+          <button
+            onClick={toggleLanguage}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:border-[#39FF14]/50 transition-colors"
+            data-testid="language-toggle"
+          >
+            <Globe className="w-5 h-5 text-[#39FF14]" />
+            <span className="text-white font-mono uppercase">{settings.language === 'sv' ? '🇸🇪 Svenska' : '🇬🇧 English'}</span>
+          </button>
         </div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-8 border-b border-white/10 pb-4 overflow-x-auto">
           {[
-            { id: 'settings', label: 'Site Settings', icon: Settings },
-            { id: 'users', label: 'User Roles', icon: Users },
-            { id: 'danger', label: 'Danger Zone', icon: AlertCircle }
+            { id: 'settings', label: t('siteSettings'), icon: Settings },
+            { id: 'users', label: t('userRoles'), icon: Users },
+            { id: 'danger', label: t('dangerZone'), icon: AlertCircle }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1643,7 +1968,7 @@ const DeveloperPage = () => {
             </div>
             <div className="glass p-4 border-l-4 border-white">
               <div className="text-3xl font-bold text-white">{devStats.users?.total || 0}</div>
-              <div className="text-xs text-gray-500 uppercase">Total Users</div>
+              <div className="text-xs text-gray-500 uppercase">{t('totalMembers')}</div>
             </div>
           </div>
         )}
@@ -1651,12 +1976,12 @@ const DeveloperPage = () => {
         {/* Settings Tab */}
         {activeTab === 'settings' && (
           <form onSubmit={updateSettings} className="glass p-6 space-y-6">
-            <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4">Site Configuration</h2>
+            <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4">{t('siteConfiguration')}</h2>
             
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  Site Name (Navigation)
+                  {t('siteName')}
                 </label>
                 <input
                   type="text"
@@ -1669,7 +1994,7 @@ const DeveloperPage = () => {
               </div>
               <div>
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  Server Name
+                  {t('serverName')}
                 </label>
                 <input
                   type="text"
@@ -1682,7 +2007,7 @@ const DeveloperPage = () => {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  Hero Title (Main Heading)
+                  {t('heroTitle')}
                 </label>
                 <input
                   type="text"
@@ -1695,7 +2020,7 @@ const DeveloperPage = () => {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  Hero Subtitle
+                  {t('heroSubtitle')}
                 </label>
                 <textarea
                   value={settings.hero_subtitle || ''}
@@ -1708,11 +2033,11 @@ const DeveloperPage = () => {
               </div>
             </div>
 
-            <h3 className="text-lg font-bold text-white uppercase tracking-wide pt-4 border-t border-white/10">Server Connection</h3>
+            <h3 className="text-lg font-bold text-white uppercase tracking-wide pt-4 border-t border-white/10">{t('serverConnection')}</h3>
             <div className="grid md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  FiveM Server IP
+                  {t('serverIP')}
                 </label>
                 <input
                   type="text"
@@ -1725,7 +2050,7 @@ const DeveloperPage = () => {
               </div>
               <div>
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  Server Port
+                  {t('serverPort')}
                 </label>
                 <input
                   type="text"
@@ -1738,7 +2063,7 @@ const DeveloperPage = () => {
               </div>
               <div>
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  Max Players
+                  {t('maxPlayers')}
                 </label>
                 <input
                   type="number"
@@ -1753,7 +2078,7 @@ const DeveloperPage = () => {
 
             <div>
               <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                Discord Invite Link
+                {t('discordInvite')}
               </label>
               <input
                 type="text"
@@ -1767,7 +2092,7 @@ const DeveloperPage = () => {
 
             <div>
               <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                Primary Color (Hex)
+                {t('primaryColor')}
               </label>
               <div className="flex gap-4 items-center">
                 <input
@@ -1791,7 +2116,7 @@ const DeveloperPage = () => {
               className="btn-primary px-8 py-4"
               data-testid="save-settings-btn"
             >
-              {loading ? 'Saving...' : 'Save Settings'}
+              {loading ? 'Saving...' : t('saveSettings')}
             </button>
           </form>
         )}
@@ -1801,7 +2126,7 @@ const DeveloperPage = () => {
           <div className="glass p-6">
             <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-[#FF003C]" />
-              User Role Management
+              {t('userRoles')}
             </h2>
             <div className="space-y-3">
               {users.map((u) => (
@@ -1853,16 +2178,16 @@ const DeveloperPage = () => {
           <div className="glass p-6">
             <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-[#FF003C]" />
-              Danger Zone
+              {t('dangerZone')}
             </h2>
-            <p className="text-gray-400 mb-6">These actions are irreversible. Use with caution.</p>
+            <p className="text-gray-400 mb-6">{t('dangerWarning')}</p>
             <div className="flex flex-wrap gap-4">
               <button
                 onClick={clearQueue}
                 className="px-6 py-3 bg-[#FF003C]/10 border border-[#FF003C] text-[#FF003C] font-bold uppercase tracking-wider hover:bg-[#FF003C] hover:text-white transition-colors"
                 data-testid="clear-queue-btn"
               >
-                Clear Entire Queue
+                {t('clearEntireQueue')}
               </button>
             </div>
           </div>
@@ -1877,29 +2202,31 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Toaster 
-          position="top-right" 
-          theme="dark"
-          toastOptions={{
-            style: {
-              background: '#0A0A0A',
-              border: '1px solid rgba(57, 255, 20, 0.3)',
-              color: '#fff',
-            },
-          }}
-        />
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/queue" element={<QueuePage />} />
-            <Route path="/apply" element={<ApplyPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/admin" element={<AdminPage />} />
-            <Route path="/developer" element={<DeveloperPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Layout>
+        <SettingsProvider>
+          <Toaster 
+            position="top-right" 
+            theme="dark"
+            toastOptions={{
+              style: {
+                background: '#0A0A0A',
+                border: '1px solid rgba(57, 255, 20, 0.3)',
+                color: '#fff',
+              },
+            }}
+          />
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/queue" element={<QueuePage />} />
+              <Route path="/apply" element={<ApplyPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/developer" element={<DeveloperPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Layout>
+        </SettingsProvider>
       </AuthProvider>
     </BrowserRouter>
   );
