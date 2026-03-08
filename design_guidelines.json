@@ -1,0 +1,138 @@
+{
+  "project_name": "FiveM_Portal_E1_Edition",
+  "version": "1.0.0",
+  "identity": {
+    "designer": "E1",
+    "philosophy": "Anti-AI, Cyberpunk, High-Contrast, Immersive",
+    "tone": "Electric, Serious, Gamified"
+  },
+  "theme": {
+    "mode": "dark",
+    "colors": {
+      "background": {
+        "primary": "#050505",
+        "secondary": "#0A0A0A",
+        "tertiary": "#121212",
+        "card": "rgba(20, 20, 20, 0.6)"
+      },
+      "text": {
+        "primary": "#FFFFFF",
+        "secondary": "#A0A0A0",
+        "muted": "#505050",
+        "accent": "#39FF14"
+      },
+      "brand": {
+        "primary": "#39FF14",
+        "primary_hover": "#32D611",
+        "secondary": "#00F0FF",
+        "danger": "#FF003C",
+        "warning": "#FAFF00",
+        "success": "#39FF14"
+      },
+      "border": {
+        "default": "#2A2A2A",
+        "active": "#39FF14",
+        "glass": "rgba(255, 255, 255, 0.1)"
+      }
+    },
+    "gradients": {
+      "primary": "linear-gradient(135deg, #39FF14 0%, #00F0FF 100%)",
+      "dark_glass": "linear-gradient(180deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%)",
+      "scanline": "linear-gradient(to bottom, rgba(57, 255, 20, 0) 50%, rgba(57, 255, 20, 0.05) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "heading": "\"Orbitron\", \"Rajdhani\", sans-serif",
+      "body": "\"Inter\", \"JetBrains Mono\", monospace",
+      "mono": "\"JetBrains Mono\", monospace"
+    },
+    "scale": {
+      "h1": "text-6xl font-black tracking-tighter uppercase",
+      "h2": "text-4xl font-bold tracking-tight uppercase",
+      "h3": "text-2xl font-bold tracking-wide uppercase",
+      "body": "text-base font-normal leading-relaxed",
+      "caption": "text-sm font-mono text-muted-foreground uppercase tracking-widest"
+    }
+  },
+  "layout": {
+    "spacing": {
+      "container_padding": "p-6 md:p-12",
+      "section_gap": "gap-8 md:gap-16",
+      "grid_gap": "gap-6"
+    },
+    "grid_system": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "landing_hero": "grid grid-cols-1 lg:grid-cols-12 gap-12 items-center",
+      "features": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+    },
+    "border_radius": {
+      "default": "rounded-none",
+      "card": "rounded-sm",
+      "button": "rounded-sm"
+    }
+  },
+  "components": {
+    "Button": {
+      "base": "relative overflow-hidden font-bold uppercase tracking-wider transition-all duration-300",
+      "variants": {
+        "primary": "bg-primary text-black hover:bg-primary-hover shadow-[0_0_20px_rgba(57,255,20,0.4)] hover:shadow-[0_0_40px_rgba(57,255,20,0.6)]",
+        "outline": "bg-transparent border border-primary text-primary hover:bg-primary/10 hover:text-white hover:border-white",
+        "ghost": "bg-transparent text-muted-foreground hover:text-primary hover:bg-white/5",
+        "glitch": "bg-black text-primary border border-primary hover:bg-primary hover:text-black relative before:content-[''] before:absolute before:inset-0 before:bg-primary/20 before:translate-x-full hover:before:translate-x-0 before:transition-transform"
+      }
+    },
+    "Card": {
+      "base": "bg-black/40 backdrop-blur-md border border-white/10 p-6 relative group overflow-hidden",
+      "hover": "hover:border-primary/50 transition-colors duration-300",
+      "decoration": "after:absolute after:top-0 after:right-0 after:w-20 after:h-20 after:bg-gradient-to-bl after:from-primary/10 after:to-transparent after:opacity-0 group-hover:after:opacity-100 transition-opacity"
+    },
+    "Input": {
+      "base": "bg-black/50 border-b-2 border-white/20 focus:border-primary text-white placeholder:text-white/30 rounded-none px-4 py-3 outline-none transition-colors font-mono"
+    },
+    "StatusBadge": {
+      "online": "bg-green-500/10 text-green-500 border border-green-500/20 px-3 py-1 text-xs font-mono uppercase tracking-wider",
+      "offline": "bg-red-500/10 text-red-500 border border-red-500/20 px-3 py-1 text-xs font-mono uppercase tracking-wider",
+      "queue": "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-3 py-1 text-xs font-mono uppercase tracking-wider"
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_bg": "https://images.unsplash.com/photo-1605218427306-022ba78fa38a?q=80&w=2070&auto=format&fit=crop",
+      "texture_noise": "https://t3.ftcdn.net/jpg/03/54/61/48/360_F_354614868_P8yw9f9f9f9f9f9f.jpg",
+      "placeholder_avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&h=200",
+      "server_logo": "https://placehold.co/150x150/000000/39FF14?text=FIVEM",
+      "steam_logo": "https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"
+    },
+    "icons": {
+      "library": "lucide-react",
+      "style": "stroke-1"
+    }
+  },
+  "animations": {
+    "hover_glow": "hover:shadow-[0_0_15px_rgba(57,255,20,0.5)] transition-shadow duration-300",
+    "text_glitch": "animate-pulse",
+    "scanline_overlay": "pointer-events-none absolute inset-0 bg-[url('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMzM0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0/3o7TKs7q8q8q8q8q8/giphy.gif')] opacity-[0.03] mix-blend-overlay"
+  },
+  "universal_guidelines": [
+    "Always use the 'Neon Green' (#39FF14) as the primary accent color.",
+    "Backgrounds must be very dark (#050505), never pure black unless for contrast.",
+    "Use 'Orbitron' font for all headings to give a futuristic/gaming feel.",
+    "Implement a 'scanline' or 'noise' texture overlay on the background for immersion.",
+    "Buttons should be rectangular with sharp edges (rounded-none or rounded-sm).",
+    "Forms should feel like a 'terminal' or 'system access' interface.",
+    "Adhere to the 'Bento Grid' layout for the dashboard.",
+    "Ensure high contrast for text (White on Black).",
+    "Use 'lucide-react' for icons.",
+    "Add data-testid attributes to all interactive elements."
+  ],
+  "instructions_to_main_agent": [
+    "1. Setup Tailwind config with the custom colors and fonts defined above.",
+    "2. Install 'lucide-react' and 'sonner' if not present.",
+    "3. Create a 'Layout' component that includes the background texture and global styles.",
+    "4. Build the 'Hero' section using the hero_bg image and a heavy gradient overlay.",
+    "5. Use the 'Card' component style for all dashboard widgets.",
+    "6. Prioritize the 'Queue' visualization - make it look like a system process list.",
+    "7. Ensure the Steam Login button is prominent and uses the Steam brand colors (or a neon variant)."
+  ]
+}
