@@ -226,22 +226,28 @@ const Home = () => {
   const { user, login } = useAuth();
   const [stats, setStats] = useState(null);
   const [serverStatus, setServerStatus] = useState(null);
+  const [settings, setSettings] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, statusRes] = await Promise.all([
+        const [statsRes, statusRes, settingsRes] = await Promise.all([
           axios.get(`${API}/stats`),
-          axios.get(`${API}/server/status`)
+          axios.get(`${API}/server/status`),
+          axios.get(`${API}/settings`)
         ]);
         setStats(statsRes.data);
         setServerStatus(statusRes.data);
+        setSettings(settingsRes.data || {});
       } catch (error) {
         console.error('Failed to fetch data:', error);
       }
     };
     fetchData();
   }, []);
+
+  const heroTitle = settings.hero_title || 'FIVEM ROLEPLAY';
+  const heroSubtitle = settings.hero_subtitle || 'Join the ultimate GTA V roleplay experience. Apply for whitelist, queue to join, and become part of our community.';
 
   return (
     <div className="relative">
@@ -266,10 +272,14 @@ const Home = () => {
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white uppercase tracking-tighter mb-4">
-            <span className="text-[#39FF14] neon-text">FiveM</span> Roleplay
+            {heroTitle.split(' ').map((word, idx) => (
+              <span key={idx} className={idx === 0 ? 'text-[#39FF14] neon-text' : ''}>
+                {word}{idx < heroTitle.split(' ').length - 1 ? ' ' : ''}
+              </span>
+            ))}
           </h1>
           <p className="text-lg sm:text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-            Join the ultimate GTA V roleplay experience. Apply for whitelist, queue to join, and become part of our community.
+            {heroSubtitle}
           </p>
 
           {/* Stats Grid */}
@@ -906,6 +916,11 @@ const AdminPage = () => {
   const [users, setUsers] = useState([]);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [banModal, setBanModal] = useState({ open: false, userId: null });
+  const [banReason, setBanReason] = useState('');
+  const [banDuration, setBanDuration] = useState('');
+  const [warnReason, setWarnReason] = useState('');
 
   const fetchApplications = useCallback(async () => {
     try {
@@ -977,13 +992,82 @@ const AdminPage = () => {
     }
   };
 
-  const toggleAdmin = async (userId) => {
+  const banUser = async () => {
+    if (!banModal.userId || !banReason) return;
     try {
-      await axios.put(`${API}/admin/users/${userId}/toggle-admin?authorization=${token}`);
-      toast.success('Admin status updated');
+      await axios.post(`${API}/admin/users/${banModal.userId}/ban?authorization=${token}`, {
+        reason: banReason,
+        duration_hours: banDuration ? parseInt(banDuration) : null
+      });
+      toast.success('User banned');
+      setBanModal({ open: false, userId: null });
+      setBanReason('');
+      setBanDuration('');
       fetchUsers();
     } catch (error) {
-      toast.error('Failed to update admin status');
+      toast.error(error.response?.data?.detail || 'Failed to ban user');
+    }
+  };
+
+  const unbanUser = async (userId) => {
+    try {
+      await axios.post(`${API}/admin/users/${userId}/unban?authorization=${token}`);
+      toast.success('User unbanned');
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to unban user');
+    }
+  };
+
+  const warnUser = async (userId) => {
+    if (!warnReason) {
+      toast.error('Please enter a warning reason');
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/users/${userId}/warn?authorization=${token}`, {
+        reason: warnReason
+      });
+      toast.success('Warning added');
+      setWarnReason('');
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to add warning');
+    }
+  };
+
+  const clearWarnings = async (userId) => {
+    try {
+      await axios.post(`${API}/admin/users/${userId}/clear-warnings?authorization=${token}`);
+      toast.success('Warnings cleared');
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to clear warnings');
+    }
+  };
+
+  const blockApplication = async (userId, appType) => {
+    try {
+      await axios.post(`${API}/admin/users/${userId}/block-application?authorization=${token}`, {
+        application_type: appType
+      });
+      toast.success(`User blocked from ${appType} applications`);
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to block');
+    }
+  };
+
+  const unblockApplication = async (userId, appType) => {
+    try {
+      await axios.post(`${API}/admin/users/${userId}/unblock-application?authorization=${token}`, {
+        application_type: appType
+      });
+      toast.success(`User unblocked from ${appType} applications`);
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to unblock');
     }
   };
 
@@ -999,16 +1083,16 @@ const AdminPage = () => {
         </h1>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 border-b border-white/10 pb-4">
+        <div className="flex gap-2 mb-8 border-b border-white/10 pb-4 overflow-x-auto">
           {[
             { id: 'applications', label: 'Applications', icon: FileText },
             { id: 'queue', label: 'Queue', icon: Users },
-            { id: 'users', label: 'Users', icon: User }
+            { id: 'users', label: 'User Management', icon: User }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-6 py-3 font-bold uppercase tracking-wider flex items-center gap-2 transition-colors ${
+              className={`px-6 py-3 font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap transition-colors ${
                 activeTab === tab.id 
                   ? 'text-[#39FF14] bg-[#39FF14]/10' 
                   : 'text-gray-500 hover:text-white hover:bg-white/5'
@@ -1024,8 +1108,7 @@ const AdminPage = () => {
         {/* Applications Tab */}
         {activeTab === 'applications' && (
           <div>
-            {/* Filters */}
-            <div className="flex gap-2 mb-6">
+            <div className="flex gap-2 mb-6 flex-wrap">
               {['pending', 'approved', 'denied'].map((status) => (
                 <button
                   key={status}
@@ -1042,7 +1125,6 @@ const AdminPage = () => {
               ))}
             </div>
 
-            {/* Applications List */}
             <div className="space-y-4">
               {applications.length === 0 ? (
                 <p className="text-gray-500 text-center py-8">No {filter} applications</p>
@@ -1163,46 +1245,213 @@ const AdminPage = () => {
           </div>
         )}
 
-        {/* Users Tab */}
+        {/* Users Tab - Enhanced with Moderation */}
         {activeTab === 'users' && (
           <div className="glass p-6">
             <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4">
               User Management ({users.length} users)
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {users.map((u) => (
-                <div key={u.id} className="flex items-center gap-4 p-4 bg-black/30 border border-white/5">
-                  <img 
-                    src={u.avatar_url || 'https://via.placeholder.com/40'} 
-                    alt={u.username}
-                    className="w-10 h-10 rounded"
-                  />
-                  <div className="flex-1">
-                    <div className="text-white font-medium">{u.username}</div>
-                    <div className="text-xs text-gray-500 font-mono">{u.steam_id}</div>
+                <div key={u.id} className="p-4 bg-black/30 border border-white/5">
+                  <div className="flex items-center gap-4">
+                    <img 
+                      src={u.avatar_url || 'https://via.placeholder.com/40'} 
+                      alt={u.username}
+                      className="w-12 h-12 rounded"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white font-bold">{u.username}</span>
+                        {u.is_developer && <span className="bg-[#FF003C]/20 text-[#FF003C] text-xs px-2 py-0.5">DEV</span>}
+                        {u.is_admin && !u.is_developer && <span className="bg-[#39FF14]/20 text-[#39FF14] text-xs px-2 py-0.5">ADMIN</span>}
+                        {u.is_vip && <span className="bg-[#00F0FF]/20 text-[#00F0FF] text-xs px-2 py-0.5">VIP</span>}
+                        {u.is_banned && <span className="bg-[#FF003C] text-white text-xs px-2 py-0.5">BANNED</span>}
+                        {u.warnings > 0 && <span className="bg-[#FAFF00]/20 text-[#FAFF00] text-xs px-2 py-0.5">{u.warnings} WARNINGS</span>}
+                        {u.blocked_applications?.includes('whitelist') && <span className="bg-orange-500/20 text-orange-500 text-xs px-2 py-0.5">WL BLOCKED</span>}
+                        {u.blocked_applications?.includes('job') && <span className="bg-orange-500/20 text-orange-500 text-xs px-2 py-0.5">JOB BLOCKED</span>}
+                      </div>
+                      <div className="text-xs text-gray-500 font-mono">{u.steam_id}</div>
+                    </div>
+                    
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => toggleVip(u.id)}
+                        className={`px-3 py-1 text-xs font-mono uppercase ${
+                          u.is_vip ? 'badge-vip' : 'bg-black/30 text-gray-500 hover:text-white'
+                        }`}
+                      >
+                        VIP
+                      </button>
+                      
+                      {!u.is_banned ? (
+                        <button
+                          onClick={() => setBanModal({ open: true, userId: u.id })}
+                          className="px-3 py-1 text-xs font-mono uppercase bg-[#FF003C]/10 text-[#FF003C] hover:bg-[#FF003C] hover:text-white"
+                          data-testid={`ban-${u.id}`}
+                        >
+                          Ban
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => unbanUser(u.id)}
+                          className="px-3 py-1 text-xs font-mono uppercase bg-[#39FF14]/10 text-[#39FF14] hover:bg-[#39FF14] hover:text-black"
+                          data-testid={`unban-${u.id}`}
+                        >
+                          Unban
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => setSelectedUser(selectedUser === u.id ? null : u.id)}
+                        className="px-3 py-1 text-xs font-mono uppercase bg-white/5 text-gray-400 hover:text-white"
+                      >
+                        More
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => toggleVip(u.id)}
-                      className={`px-3 py-1 text-xs font-mono uppercase ${
-                        u.is_vip ? 'badge-vip' : 'bg-black/30 text-gray-500'
-                      }`}
-                      data-testid={`toggle-vip-${u.id}`}
-                    >
-                      VIP
-                    </button>
-                    <button
-                      onClick={() => toggleAdmin(u.id)}
-                      className={`px-3 py-1 text-xs font-mono uppercase ${
-                        u.is_admin ? 'badge-online' : 'bg-black/30 text-gray-500'
-                      }`}
-                      data-testid={`toggle-admin-${u.id}`}
-                    >
-                      Admin
-                    </button>
-                  </div>
+
+                  {/* Expanded User Actions */}
+                  {selectedUser === u.id && (
+                    <div className="mt-4 pt-4 border-t border-white/10 space-y-4">
+                      {/* Warnings Section */}
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="text"
+                          value={warnReason}
+                          onChange={(e) => setWarnReason(e.target.value)}
+                          placeholder="Warning reason..."
+                          className="terminal-input flex-1 text-white p-2 text-sm"
+                        />
+                        <button
+                          onClick={() => warnUser(u.id)}
+                          className="px-4 py-2 text-xs font-mono uppercase bg-[#FAFF00]/10 text-[#FAFF00] hover:bg-[#FAFF00] hover:text-black"
+                        >
+                          Add Warning
+                        </button>
+                        {u.warnings > 0 && (
+                          <button
+                            onClick={() => clearWarnings(u.id)}
+                            className="px-4 py-2 text-xs font-mono uppercase bg-white/5 text-gray-400 hover:text-white"
+                          >
+                            Clear Warnings
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Warning History */}
+                      {u.warning_reasons?.length > 0 && (
+                        <div className="bg-black/30 p-3">
+                          <div className="text-xs text-gray-500 uppercase mb-2">Warning History:</div>
+                          {u.warning_reasons.map((reason, idx) => (
+                            <div key={idx} className="text-xs text-[#FAFF00] font-mono">{reason}</div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Application Blocks */}
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs text-gray-500 uppercase">Block Applications:</span>
+                        {!u.blocked_applications?.includes('whitelist') ? (
+                          <button
+                            onClick={() => blockApplication(u.id, 'whitelist')}
+                            className="px-3 py-1 text-xs font-mono uppercase bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white"
+                          >
+                            Block Whitelist
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => unblockApplication(u.id, 'whitelist')}
+                            className="px-3 py-1 text-xs font-mono uppercase bg-[#39FF14]/10 text-[#39FF14]"
+                          >
+                            Unblock Whitelist
+                          </button>
+                        )}
+                        {!u.blocked_applications?.includes('job') ? (
+                          <button
+                            onClick={() => blockApplication(u.id, 'job')}
+                            className="px-3 py-1 text-xs font-mono uppercase bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white"
+                          >
+                            Block Jobs
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => unblockApplication(u.id, 'job')}
+                            className="px-3 py-1 text-xs font-mono uppercase bg-[#39FF14]/10 text-[#39FF14]"
+                          >
+                            Unblock Jobs
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Ban Info */}
+                      {u.is_banned && u.ban_reason && (
+                        <div className="bg-[#FF003C]/10 border border-[#FF003C]/30 p-3">
+                          <div className="text-xs text-[#FF003C] uppercase mb-1">Ban Reason:</div>
+                          <div className="text-white text-sm">{u.ban_reason}</div>
+                          {u.ban_expires && (
+                            <div className="text-xs text-gray-400 mt-1">Expires: {new Date(u.ban_expires).toLocaleString()}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Ban Modal */}
+        {banModal.open && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="glass p-6 max-w-md w-full">
+              <h3 className="text-xl font-bold text-white uppercase mb-4">Ban User</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-mono text-gray-400 uppercase mb-2">Reason *</label>
+                  <input
+                    type="text"
+                    value={banReason}
+                    onChange={(e) => setBanReason(e.target.value)}
+                    placeholder="Enter ban reason..."
+                    className="terminal-input w-full text-white p-3"
+                    data-testid="ban-reason-input"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-mono text-gray-400 uppercase mb-2">Duration (hours, empty = permanent)</label>
+                  <select
+                    value={banDuration}
+                    onChange={(e) => setBanDuration(e.target.value)}
+                    className="w-full bg-black/50 border border-white/10 text-white p-3"
+                    data-testid="ban-duration-select"
+                  >
+                    <option value="">Permanent</option>
+                    <option value="1">1 Hour</option>
+                    <option value="6">6 Hours</option>
+                    <option value="24">1 Day</option>
+                    <option value="72">3 Days</option>
+                    <option value="168">1 Week</option>
+                    <option value="720">30 Days</option>
+                  </select>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={banUser}
+                    className="flex-1 py-3 bg-[#FF003C] text-white font-bold uppercase"
+                    data-testid="confirm-ban-btn"
+                  >
+                    Confirm Ban
+                  </button>
+                  <button
+                    onClick={() => setBanModal({ open: false, userId: null })}
+                    className="flex-1 py-3 bg-white/10 text-white font-bold uppercase"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1213,21 +1462,25 @@ const AdminPage = () => {
 
 // ==================== DEVELOPER PAGE ====================
 const DeveloperPage = () => {
-  const { user, token, setAuthToken } = useAuth();
+  const { user, token } = useAuth();
   const [secretCode, setSecretCode] = useState('');
   const [devStats, setDevStats] = useState(null);
   const [users, setUsers] = useState([]);
+  const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('settings');
 
   const fetchDevData = useCallback(async () => {
     if (!user?.is_developer) return;
     try {
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, usersRes, settingsRes] = await Promise.all([
         axios.get(`${API}/developer/stats?authorization=${token}`),
-        axios.get(`${API}/admin/users?authorization=${token}`)
+        axios.get(`${API}/admin/users?authorization=${token}`),
+        axios.get(`${API}/settings`)
       ]);
       setDevStats(statsRes.data);
       setUsers(usersRes.data.users || []);
+      setSettings(settingsRes.data || {});
     } catch (error) {
       console.error('Failed to fetch dev data:', error);
     }
@@ -1245,10 +1498,23 @@ const DeveloperPage = () => {
         secret_code: secretCode
       });
       toast.success('Developer status granted! Refreshing...');
-      // Refresh user data
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Invalid secret code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSettings = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.put(`${API}/developer/settings?authorization=${token}`, settings);
+      toast.success('Settings updated! Refresh to see changes.');
+      fetchDevData();
+    } catch (error) {
+      toast.error('Failed to update settings');
     } finally {
       setLoading(false);
     }
@@ -1338,6 +1604,28 @@ const DeveloperPage = () => {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-2 mb-8 border-b border-white/10 pb-4 overflow-x-auto">
+          {[
+            { id: 'settings', label: 'Site Settings', icon: Settings },
+            { id: 'users', label: 'User Roles', icon: Users },
+            { id: 'danger', label: 'Danger Zone', icon: AlertCircle }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-3 font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap transition-colors ${
+                activeTab === tab.id 
+                  ? 'text-[#FF003C] bg-[#FF003C]/10' 
+                  : 'text-gray-500 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <tab.icon className="w-5 h-5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Stats Grid */}
         {devStats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -1360,73 +1648,225 @@ const DeveloperPage = () => {
           </div>
         )}
 
-        {/* Quick Actions */}
-        <div className="glass p-6 mb-8">
-          <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-[#FF003C]" />
-            Danger Zone
-          </h2>
-          <div className="flex gap-4">
-            <button
-              onClick={clearQueue}
-              className="px-6 py-3 bg-[#FF003C]/10 border border-[#FF003C] text-[#FF003C] font-bold uppercase tracking-wider hover:bg-[#FF003C] hover:text-white transition-colors"
-              data-testid="clear-queue-btn"
-            >
-              Clear Entire Queue
-            </button>
-          </div>
-        </div>
-
-        {/* User Management */}
-        <div className="glass p-6">
-          <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#FF003C]" />
-            User Role Management
-          </h2>
-          <div className="space-y-3">
-            {users.map((u) => (
-              <div key={u.id} className="flex items-center gap-4 p-4 bg-black/30 border border-white/5">
-                <img 
-                  src={u.avatar_url || 'https://via.placeholder.com/40'} 
-                  alt={u.username}
-                  className="w-12 h-12 rounded"
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <form onSubmit={updateSettings} className="glass p-6 space-y-6">
+            <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4">Site Configuration</h2>
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  Site Name (Navigation)
+                </label>
+                <input
+                  type="text"
+                  value={settings.site_name || ''}
+                  onChange={(e) => setSettings({...settings, site_name: e.target.value})}
+                  placeholder="FIVEM PORTAL"
+                  className="terminal-input w-full text-white p-3"
+                  data-testid="site-name-input"
                 />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white font-bold">{u.username}</span>
-                    {u.is_developer && <span className="bg-[#FF003C]/20 text-[#FF003C] text-xs px-2 py-0.5">DEV</span>}
-                    {u.is_admin && !u.is_developer && <span className="bg-[#39FF14]/20 text-[#39FF14] text-xs px-2 py-0.5">ADMIN</span>}
-                    {u.is_vip && !u.is_admin && <span className="bg-[#00F0FF]/20 text-[#00F0FF] text-xs px-2 py-0.5">VIP</span>}
-                  </div>
-                  <div className="text-xs text-gray-500 font-mono">{u.steam_id}</div>
-                </div>
-                <div className="flex gap-2">
-                  <select
-                    onChange={(e) => setUserRole(u.id, e.target.value)}
-                    className="bg-black/50 border border-white/10 text-white text-sm px-3 py-2"
-                    defaultValue=""
-                    data-testid={`role-select-${u.id}`}
-                  >
-                    <option value="" disabled>Set Role...</option>
-                    <option value="developer">Developer</option>
-                    <option value="admin">Admin</option>
-                    <option value="vip">VIP</option>
-                    <option value="regular">Regular</option>
-                  </select>
-                  {u.id !== user.id && (
-                    <button
-                      onClick={() => deleteUser(u.id)}
-                      className="px-3 py-2 bg-[#FF003C]/10 text-[#FF003C] hover:bg-[#FF003C] hover:text-white transition-colors"
-                      data-testid={`delete-user-${u.id}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
               </div>
-            ))}
+              <div>
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  Server Name
+                </label>
+                <input
+                  type="text"
+                  value={settings.server_name || ''}
+                  onChange={(e) => setSettings({...settings, server_name: e.target.value})}
+                  placeholder="FiveM Roleplay Server"
+                  className="terminal-input w-full text-white p-3"
+                  data-testid="server-name-input"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  Hero Title (Main Heading)
+                </label>
+                <input
+                  type="text"
+                  value={settings.hero_title || ''}
+                  onChange={(e) => setSettings({...settings, hero_title: e.target.value})}
+                  placeholder="FIVEM ROLEPLAY"
+                  className="terminal-input w-full text-white p-3"
+                  data-testid="hero-title-input"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  Hero Subtitle
+                </label>
+                <textarea
+                  value={settings.hero_subtitle || ''}
+                  onChange={(e) => setSettings({...settings, hero_subtitle: e.target.value})}
+                  placeholder="Join the ultimate GTA V roleplay experience..."
+                  rows={2}
+                  className="terminal-input w-full text-white p-3 resize-none"
+                  data-testid="hero-subtitle-input"
+                />
+              </div>
+            </div>
+
+            <h3 className="text-lg font-bold text-white uppercase tracking-wide pt-4 border-t border-white/10">Server Connection</h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  FiveM Server IP
+                </label>
+                <input
+                  type="text"
+                  value={settings.fivem_server_ip || ''}
+                  onChange={(e) => setSettings({...settings, fivem_server_ip: e.target.value})}
+                  placeholder="123.456.789.0"
+                  className="terminal-input w-full text-white p-3"
+                  data-testid="server-ip-input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  Server Port
+                </label>
+                <input
+                  type="text"
+                  value={settings.fivem_server_port || ''}
+                  onChange={(e) => setSettings({...settings, fivem_server_port: e.target.value})}
+                  placeholder="30120"
+                  className="terminal-input w-full text-white p-3"
+                  data-testid="server-port-input"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  Max Players
+                </label>
+                <input
+                  type="number"
+                  value={settings.max_players || ''}
+                  onChange={(e) => setSettings({...settings, max_players: parseInt(e.target.value) || 64})}
+                  placeholder="64"
+                  className="terminal-input w-full text-white p-3"
+                  data-testid="max-players-input"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                Discord Invite Link
+              </label>
+              <input
+                type="text"
+                value={settings.discord_invite || ''}
+                onChange={(e) => setSettings({...settings, discord_invite: e.target.value})}
+                placeholder="https://discord.gg/yourserver"
+                className="terminal-input w-full text-white p-3"
+                data-testid="discord-input"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                Primary Color (Hex)
+              </label>
+              <div className="flex gap-4 items-center">
+                <input
+                  type="text"
+                  value={settings.primary_color || '#39FF14'}
+                  onChange={(e) => setSettings({...settings, primary_color: e.target.value})}
+                  placeholder="#39FF14"
+                  className="terminal-input flex-1 text-white p-3"
+                  data-testid="color-input"
+                />
+                <div 
+                  className="w-12 h-12 border border-white/20"
+                  style={{backgroundColor: settings.primary_color || '#39FF14'}}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary px-8 py-4"
+              data-testid="save-settings-btn"
+            >
+              {loading ? 'Saving...' : 'Save Settings'}
+            </button>
+          </form>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="glass p-6">
+            <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-[#FF003C]" />
+              User Role Management
+            </h2>
+            <div className="space-y-3">
+              {users.map((u) => (
+                <div key={u.id} className="flex items-center gap-4 p-4 bg-black/30 border border-white/5">
+                  <img 
+                    src={u.avatar_url || 'https://via.placeholder.com/40'} 
+                    alt={u.username}
+                    className="w-12 h-12 rounded"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold">{u.username}</span>
+                      {u.is_developer && <span className="bg-[#FF003C]/20 text-[#FF003C] text-xs px-2 py-0.5">DEV</span>}
+                      {u.is_admin && !u.is_developer && <span className="bg-[#39FF14]/20 text-[#39FF14] text-xs px-2 py-0.5">ADMIN</span>}
+                      {u.is_vip && !u.is_admin && <span className="bg-[#00F0FF]/20 text-[#00F0FF] text-xs px-2 py-0.5">VIP</span>}
+                      {u.is_banned && <span className="bg-[#FF003C]/20 text-[#FF003C] text-xs px-2 py-0.5">BANNED</span>}
+                    </div>
+                    <div className="text-xs text-gray-500 font-mono">{u.steam_id}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      onChange={(e) => setUserRole(u.id, e.target.value)}
+                      className="bg-black/50 border border-white/10 text-white text-sm px-3 py-2"
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Set Role...</option>
+                      <option value="developer">Developer</option>
+                      <option value="admin">Admin</option>
+                      <option value="vip">VIP</option>
+                      <option value="regular">Regular</option>
+                    </select>
+                    {u.id !== user.id && (
+                      <button
+                        onClick={() => deleteUser(u.id)}
+                        className="px-3 py-2 bg-[#FF003C]/10 text-[#FF003C] hover:bg-[#FF003C] hover:text-white transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Danger Zone Tab */}
+        {activeTab === 'danger' && (
+          <div className="glass p-6">
+            <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-[#FF003C]" />
+              Danger Zone
+            </h2>
+            <p className="text-gray-400 mb-6">These actions are irreversible. Use with caution.</p>
+            <div className="flex flex-wrap gap-4">
+              <button
+                onClick={clearQueue}
+                className="px-6 py-3 bg-[#FF003C]/10 border border-[#FF003C] text-[#FF003C] font-bold uppercase tracking-wider hover:bg-[#FF003C] hover:text-white transition-colors"
+                data-testid="clear-queue-btn"
+              >
+                Clear Entire Queue
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

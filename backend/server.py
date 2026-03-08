@@ -50,7 +50,27 @@ class User(BaseModel):
     is_admin: bool = False
     is_vip: bool = False
     is_developer: bool = False  # Supreme role - can do EVERYTHING
+    is_banned: bool = False
+    ban_reason: Optional[str] = None
+    ban_expires: Optional[datetime] = None
+    warnings: int = 0
+    warning_reasons: List[str] = Field(default_factory=list)
+    blocked_applications: List[str] = Field(default_factory=list)  # whitelist, job
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SiteSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = "site_settings"
+    site_name: str = "FIVEM PORTAL"
+    server_name: str = "FiveM Roleplay Server"
+    hero_title: str = "FIVEM ROLEPLAY"
+    hero_subtitle: str = "Join the ultimate GTA V roleplay experience. Apply for whitelist, queue to join, and become part of our community."
+    fivem_server_ip: str = ""
+    fivem_server_port: str = "30120"
+    discord_invite: str = ""
+    max_players: int = 64
+    primary_color: str = "#39FF14"
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class QueueEntry(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -110,6 +130,27 @@ class ApplicationReview(BaseModel):
 
 class QueueJoin(BaseModel):
     pass  # User info comes from token
+
+class SiteSettingsUpdate(BaseModel):
+    site_name: Optional[str] = None
+    server_name: Optional[str] = None
+    hero_title: Optional[str] = None
+    hero_subtitle: Optional[str] = None
+    fivem_server_ip: Optional[str] = None
+    fivem_server_port: Optional[str] = None
+    discord_invite: Optional[str] = None
+    max_players: Optional[int] = None
+    primary_color: Optional[str] = None
+
+class BanUserRequest(BaseModel):
+    reason: str
+    duration_hours: Optional[int] = None  # None = permanent
+
+class WarningRequest(BaseModel):
+    reason: str
+
+class BlockApplicationRequest(BaseModel):
+    application_type: str  # whitelist, job
 
 class UserResponse(BaseModel):
     id: str
@@ -288,13 +329,55 @@ async def logout():
 async def get_server_status():
     """Get current server status"""
     queue_count = await db.queue.count_documents({})
+    settings = await db.settings.find_one({"id": "site_settings"}, {"_id": 0})
+    server_name = settings.get("server_name", "FiveM Roleplay Server") if settings else "FiveM Roleplay Server"
+    max_players = settings.get("max_players", 64) if settings else 64
+    
     return ServerStatus(
         online=True,
         players_online=42,
-        max_players=64,
+        max_players=max_players,
         queue_length=queue_count,
-        server_name="FiveM Roleplay Server"
+        server_name=server_name
     )
+
+# ==================== SITE SETTINGS ====================
+
+@api_router.get("/settings")
+async def get_site_settings():
+    """Get public site settings"""
+    settings = await db.settings.find_one({"id": "site_settings"}, {"_id": 0})
+    if not settings:
+        # Return defaults
+        default_settings = SiteSettings()
+        return default_settings.model_dump()
+    return settings
+
+@api_router.put("/developer/settings")
+async def update_site_settings(data: SiteSettingsUpdate, authorization: str = Query(None)):
+    """Developer only: Update site settings"""
+    dev = await get_current_user(authorization)
+    if not dev or not dev.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Developer access required")
+    
+    # Get current settings or create defaults
+    settings = await db.settings.find_one({"id": "site_settings"}, {"_id": 0})
+    if not settings:
+        settings = SiteSettings().model_dump()
+        settings['updated_at'] = settings['updated_at'].isoformat()
+        await db.settings.insert_one(settings)
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    await db.settings.update_one(
+        {"id": "site_settings"},
+        {"$set": update_data}
+    )
+    
+    updated = await db.settings.find_one({"id": "site_settings"}, {"_id": 0})
+    return updated
 
 # ==================== QUEUE ====================
 
@@ -389,6 +472,21 @@ async def create_application(data: ApplicationCreate, authorization: str = Query
     user = await get_current_user(authorization)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Check if user is banned
+    if user.get("is_banned"):
+        ban_expires = user.get("ban_expires")
+        if ban_expires:
+            # Check if ban expired
+            if datetime.fromisoformat(ban_expires) > datetime.now(timezone.utc):
+                raise HTTPException(status_code=403, detail=f"You are banned until {ban_expires}. Reason: {user.get('ban_reason', 'No reason provided')}")
+        else:
+            raise HTTPException(status_code=403, detail=f"You are permanently banned. Reason: {user.get('ban_reason', 'No reason provided')}")
+    
+    # Check if user is blocked from this application type
+    blocked = user.get("blocked_applications", [])
+    if data.application_type in blocked:
+        raise HTTPException(status_code=403, detail=f"You are blocked from submitting {data.application_type} applications")
     
     # Check for existing pending application of same type
     existing = await db.applications.find_one({
@@ -660,6 +758,172 @@ async def developer_set_role(
     
     await db.users.update_one({"id": user_id}, {"$set": updates})
     return {"message": f"User role set to {role}", "role": role}
+
+# ==================== ADMIN MODERATION ====================
+
+@api_router.post("/admin/users/{user_id}/ban")
+async def admin_ban_user(user_id: str, data: BanUserRequest, authorization: str = Query(None)):
+    """Admin/Developer: Ban a user"""
+    admin = await get_current_user(authorization)
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Can't ban developers unless you're a developer
+    if target.get("is_developer") and not admin.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Cannot ban a developer")
+    
+    ban_expires = None
+    if data.duration_hours:
+        ban_expires = (datetime.now(timezone.utc) + timedelta(hours=data.duration_hours)).isoformat()
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "is_banned": True,
+            "ban_reason": data.reason,
+            "ban_expires": ban_expires
+        }}
+    )
+    
+    # Remove from queue if banned
+    await db.queue.delete_many({"user_id": user_id})
+    
+    duration_text = f"{data.duration_hours} hours" if data.duration_hours else "permanently"
+    return {"message": f"User banned {duration_text}", "ban_expires": ban_expires}
+
+@api_router.post("/admin/users/{user_id}/unban")
+async def admin_unban_user(user_id: str, authorization: str = Query(None)):
+    """Admin/Developer: Unban a user"""
+    admin = await get_current_user(authorization)
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "is_banned": False,
+            "ban_reason": None,
+            "ban_expires": None
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "User unbanned"}
+
+@api_router.post("/admin/users/{user_id}/warn")
+async def admin_warn_user(user_id: str, data: WarningRequest, authorization: str = Query(None)):
+    """Admin/Developer: Add warning to user"""
+    admin = await get_current_user(authorization)
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    current_warnings = target.get("warnings", 0) + 1
+    warning_reasons = target.get("warning_reasons", [])
+    warning_reasons.append(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] {data.reason}")
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "warnings": current_warnings,
+            "warning_reasons": warning_reasons
+        }}
+    )
+    
+    return {"message": f"Warning added. User now has {current_warnings} warning(s)", "warnings": current_warnings}
+
+@api_router.post("/admin/users/{user_id}/clear-warnings")
+async def admin_clear_warnings(user_id: str, authorization: str = Query(None)):
+    """Admin/Developer: Clear all warnings"""
+    admin = await get_current_user(authorization)
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    result = await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"warnings": 0, "warning_reasons": []}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "Warnings cleared"}
+
+@api_router.post("/admin/users/{user_id}/block-application")
+async def admin_block_application(user_id: str, data: BlockApplicationRequest, authorization: str = Query(None)):
+    """Admin/Developer: Block user from specific application type"""
+    admin = await get_current_user(authorization)
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    if data.application_type not in ["whitelist", "job"]:
+        raise HTTPException(status_code=400, detail="Invalid application type")
+    
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    blocked = target.get("blocked_applications", [])
+    if data.application_type not in blocked:
+        blocked.append(data.application_type)
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"blocked_applications": blocked}}
+    )
+    
+    return {"message": f"User blocked from {data.application_type} applications"}
+
+@api_router.post("/admin/users/{user_id}/unblock-application")
+async def admin_unblock_application(user_id: str, data: BlockApplicationRequest, authorization: str = Query(None)):
+    """Admin/Developer: Unblock user from application type"""
+    admin = await get_current_user(authorization)
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    blocked = target.get("blocked_applications", [])
+    if data.application_type in blocked:
+        blocked.remove(data.application_type)
+    
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"blocked_applications": blocked}}
+    )
+    
+    return {"message": f"User unblocked from {data.application_type} applications"}
+
+@api_router.get("/admin/users/{user_id}/details")
+async def admin_get_user_details(user_id: str, authorization: str = Query(None)):
+    """Admin/Developer: Get detailed user info including moderation history"""
+    admin = await get_current_user(authorization)
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get user's applications
+    applications = await db.applications.find({"user_id": user_id}, {"_id": 0}).to_list(100)
+    
+    return {
+        "user": user,
+        "applications": applications,
+        "application_count": len(applications)
+    }
 
 @api_router.delete("/developer/users/{user_id}")
 async def developer_delete_user(user_id: str, authorization: str = Query(None)):
