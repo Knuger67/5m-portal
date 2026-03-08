@@ -1,34 +1,24 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* FiveM Portal - Custom Styles */
+
+.App {
+  min-height: 100vh;
+  background-color: #050505;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
-}
-
+/* Override any conflicting styles */
 .App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+  background-color: transparent;
+  min-height: auto;
 }
 
-.App-link {
-    color: #61dafb;
+/* Smooth transitions globally */
+* {
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Disable transitions on transform to prevent glitches */
+*:not(.animate-slide-up):not(.animate-fade-in) {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
 }
