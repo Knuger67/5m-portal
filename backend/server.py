@@ -28,6 +28,7 @@ STEAM_API_KEY = os.environ.get('STEAM_API_KEY', '')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'default-secret-change-me')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:8001')
+DEVELOPER_SECRET = os.environ.get('DEVELOPER_SECRET', 'change-this-secret')
 
 # Create the main app
 app = FastAPI(title="FiveM Portal API")
@@ -48,6 +49,7 @@ class User(BaseModel):
     profile_url: Optional[str] = None
     is_admin: bool = False
     is_vip: bool = False
+    is_developer: bool = False  # Supreme role - can do EVERYTHING
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class QueueEntry(BaseModel):
@@ -117,6 +119,7 @@ class UserResponse(BaseModel):
     profile_url: Optional[str]
     is_admin: bool
     is_vip: bool
+    is_developer: bool
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -211,7 +214,8 @@ async def steam_callback(request: Request):
                     avatar_url=player.get("avatarfull"),
                     profile_url=player.get("profileurl"),
                     is_admin=False,
-                    is_vip=False
+                    is_vip=False,
+                    is_developer=False
                 )
                 user_dict = user.model_dump()
                 user_dict['created_at'] = user_dict['created_at'].isoformat()
@@ -445,9 +449,9 @@ async def admin_get_applications(
     application_type: str = Query(None),
     authorization: str = Query(None)
 ):
-    """Admin: Get all applications with filters"""
+    """Admin/Developer: Get all applications with filters"""
     user = await get_current_user(authorization)
-    if not user or not user.get("is_admin"):
+    if not user or (not user.get("is_admin") and not user.get("is_developer")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     query = {}
@@ -479,9 +483,9 @@ async def admin_review_application(
     review: ApplicationReview,
     authorization: str = Query(None)
 ):
-    """Admin: Review an application"""
+    """Admin/Developer: Review an application"""
     user = await get_current_user(authorization)
-    if not user or not user.get("is_admin"):
+    if not user or (not user.get("is_admin") and not user.get("is_developer")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     application = await db.applications.find_one({"id": application_id}, {"_id": 0})
@@ -502,9 +506,9 @@ async def admin_review_application(
 
 @api_router.get("/admin/queue")
 async def admin_get_queue(authorization: str = Query(None)):
-    """Admin: Get full queue with management options"""
+    """Admin/Developer: Get full queue with management options"""
     user = await get_current_user(authorization)
-    if not user or not user.get("is_admin"):
+    if not user or (not user.get("is_admin") and not user.get("is_developer")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     entries = await db.queue.find({}, {"_id": 0}).sort("position", 1).to_list(500)
@@ -512,9 +516,9 @@ async def admin_get_queue(authorization: str = Query(None)):
 
 @api_router.delete("/admin/queue/{entry_id}")
 async def admin_remove_from_queue(entry_id: str, authorization: str = Query(None)):
-    """Admin: Remove user from queue"""
+    """Admin/Developer: Remove user from queue"""
     user = await get_current_user(authorization)
-    if not user or not user.get("is_admin"):
+    if not user or (not user.get("is_admin") and not user.get("is_developer")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     result = await db.queue.delete_one({"id": entry_id})
@@ -526,9 +530,9 @@ async def admin_remove_from_queue(entry_id: str, authorization: str = Query(None
 
 @api_router.put("/admin/queue/{entry_id}/priority")
 async def admin_set_priority(entry_id: str, priority: str = Query(...), authorization: str = Query(None)):
-    """Admin: Set queue entry priority"""
+    """Admin/Developer: Set queue entry priority"""
     user = await get_current_user(authorization)
-    if not user or not user.get("is_admin"):
+    if not user or (not user.get("is_admin") and not user.get("is_developer")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     if priority not in ["regular", "vip"]:
@@ -547,9 +551,9 @@ async def admin_set_priority(entry_id: str, priority: str = Query(...), authoriz
 
 @api_router.get("/admin/users")
 async def admin_get_users(authorization: str = Query(None)):
-    """Admin: Get all users"""
+    """Admin/Developer: Get all users"""
     user = await get_current_user(authorization)
-    if not user or not user.get("is_admin"):
+    if not user or (not user.get("is_admin") and not user.get("is_developer")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     users = await db.users.find({}, {"_id": 0}).to_list(500)
@@ -557,9 +561,9 @@ async def admin_get_users(authorization: str = Query(None)):
 
 @api_router.put("/admin/users/{user_id}/toggle-vip")
 async def admin_toggle_vip(user_id: str, authorization: str = Query(None)):
-    """Admin: Toggle VIP status"""
+    """Admin/Developer: Toggle VIP status"""
     admin = await get_current_user(authorization)
-    if not admin or not admin.get("is_admin"):
+    if not admin or (not admin.get("is_admin") and not admin.get("is_developer")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
@@ -576,10 +580,11 @@ async def admin_toggle_vip(user_id: str, authorization: str = Query(None)):
 
 @api_router.put("/admin/users/{user_id}/toggle-admin")
 async def admin_toggle_admin(user_id: str, authorization: str = Query(None)):
-    """Admin: Toggle admin status"""
+    """Developer only: Toggle admin status"""
     admin = await get_current_user(authorization)
-    if not admin or not admin.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Admin access required")
+    # Only developers can toggle admin status
+    if not admin or not admin.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Developer access required")
     
     user = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
@@ -592,6 +597,135 @@ async def admin_toggle_admin(user_id: str, authorization: str = Query(None)):
     )
     
     return {"message": f"Admin status set to {new_admin_status}", "is_admin": new_admin_status}
+
+# ==================== DEVELOPER ENDPOINTS ====================
+
+class ClaimDeveloperRequest(BaseModel):
+    secret_code: str
+
+@api_router.post("/developer/claim")
+async def claim_developer(data: ClaimDeveloperRequest, authorization: str = Query(None)):
+    """Claim developer status with secret code"""
+    user = await get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    if data.secret_code != DEVELOPER_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid secret code")
+    
+    # Set user as developer (supreme role)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"is_developer": True, "is_admin": True, "is_vip": True}}
+    )
+    
+    return {"message": "Developer status granted! You now have supreme access.", "is_developer": True}
+
+@api_router.put("/developer/users/{user_id}/set-role")
+async def developer_set_role(
+    user_id: str, 
+    role: str = Query(...),  # developer, admin, vip, regular
+    authorization: str = Query(None)
+):
+    """Developer only: Set any role on any user"""
+    dev = await get_current_user(authorization)
+    if not dev or not dev.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Developer access required")
+    
+    target_user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    updates = {}
+    if role == "developer":
+        updates = {"is_developer": True, "is_admin": True, "is_vip": True}
+    elif role == "admin":
+        updates = {"is_developer": False, "is_admin": True, "is_vip": True}
+    elif role == "vip":
+        updates = {"is_developer": False, "is_admin": False, "is_vip": True}
+    elif role == "regular":
+        updates = {"is_developer": False, "is_admin": False, "is_vip": False}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid role. Use: developer, admin, vip, regular")
+    
+    await db.users.update_one({"id": user_id}, {"$set": updates})
+    return {"message": f"User role set to {role}", "role": role}
+
+@api_router.delete("/developer/users/{user_id}")
+async def developer_delete_user(user_id: str, authorization: str = Query(None)):
+    """Developer only: Delete a user completely"""
+    dev = await get_current_user(authorization)
+    if not dev or not dev.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Developer access required")
+    
+    # Don't allow deleting yourself
+    if dev["id"] == user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    # Delete user and all their data
+    await db.users.delete_one({"id": user_id})
+    await db.queue.delete_many({"user_id": user_id})
+    await db.applications.delete_many({"user_id": user_id})
+    
+    return {"message": "User and all associated data deleted"}
+
+@api_router.delete("/developer/applications/{application_id}")
+async def developer_delete_application(application_id: str, authorization: str = Query(None)):
+    """Developer only: Delete any application"""
+    dev = await get_current_user(authorization)
+    if not dev or not dev.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Developer access required")
+    
+    result = await db.applications.delete_one({"id": application_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    return {"message": "Application deleted"}
+
+@api_router.delete("/developer/queue/clear")
+async def developer_clear_queue(authorization: str = Query(None)):
+    """Developer only: Clear entire queue"""
+    dev = await get_current_user(authorization)
+    if not dev or not dev.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Developer access required")
+    
+    result = await db.queue.delete_many({})
+    return {"message": f"Queue cleared. {result.deleted_count} entries removed."}
+
+@api_router.get("/developer/stats")
+async def developer_stats(authorization: str = Query(None)):
+    """Developer only: Get detailed system stats"""
+    dev = await get_current_user(authorization)
+    if not dev or not dev.get("is_developer"):
+        raise HTTPException(status_code=403, detail="Developer access required")
+    
+    user_count = await db.users.count_documents({})
+    admin_count = await db.users.count_documents({"is_admin": True})
+    developer_count = await db.users.count_documents({"is_developer": True})
+    vip_count = await db.users.count_documents({"is_vip": True})
+    queue_count = await db.queue.count_documents({})
+    total_apps = await db.applications.count_documents({})
+    pending_apps = await db.applications.count_documents({"status": "pending"})
+    approved_apps = await db.applications.count_documents({"status": "approved"})
+    denied_apps = await db.applications.count_documents({"status": "denied"})
+    
+    return {
+        "users": {
+            "total": user_count,
+            "developers": developer_count,
+            "admins": admin_count,
+            "vips": vip_count
+        },
+        "queue": {
+            "current": queue_count
+        },
+        "applications": {
+            "total": total_apps,
+            "pending": pending_apps,
+            "approved": approved_apps,
+            "denied": denied_apps
+        }
+    }
 
 # ==================== STATS ====================
 

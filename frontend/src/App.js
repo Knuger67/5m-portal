@@ -106,7 +106,8 @@ const Layout = ({ children }) => {
     { path: '/queue', label: 'Queue', icon: Users },
     { path: '/apply', label: 'Apply', icon: FileText },
     ...(user ? [{ path: '/dashboard', label: 'Dashboard', icon: User }] : []),
-    ...(user?.is_admin ? [{ path: '/admin', label: 'Admin', icon: Shield }] : []),
+    ...(user?.is_admin || user?.is_developer ? [{ path: '/admin', label: 'Admin', icon: Shield }] : []),
+    ...(user?.is_developer ? [{ path: '/developer', label: 'Dev', icon: Settings }] : []),
   ];
 
   return (
@@ -154,6 +155,7 @@ const Layout = ({ children }) => {
                   />
                   <span className="text-white text-sm hidden sm:block">{user.username}</span>
                   {user.is_vip && <Crown className="w-4 h-4 text-[#00F0FF]" />}
+                  {user.is_developer && <Settings className="w-4 h-4 text-[#FF003C]" />}
                   <button 
                     onClick={logout}
                     className="p-2 text-gray-400 hover:text-[#FF003C] transition-colors"
@@ -816,6 +818,7 @@ const DashboardPage = () => {
                 <div className="text-xl font-bold text-white">{user.username}</div>
                 <div className="text-sm text-gray-500 font-mono">{user.steam_id}</div>
                 <div className="flex gap-2 mt-2">
+                  {user.is_developer && <span className="bg-[#FF003C]/10 text-[#FF003C] border border-[#FF003C]/30 px-2 py-1 text-xs">Developer</span>}
                   {user.is_vip && <span className="badge-vip px-2 py-1 text-xs">VIP</span>}
                   {user.is_admin && <span className="badge-online px-2 py-1 text-xs">Admin</span>}
                 </div>
@@ -984,7 +987,7 @@ const AdminPage = () => {
     }
   };
 
-  if (!user?.is_admin) {
+  if (!user?.is_admin && !user?.is_developer) {
     return <Navigate to="/" replace />;
   }
 
@@ -1208,6 +1211,227 @@ const AdminPage = () => {
   );
 };
 
+// ==================== DEVELOPER PAGE ====================
+const DeveloperPage = () => {
+  const { user, token, setAuthToken } = useAuth();
+  const [secretCode, setSecretCode] = useState('');
+  const [devStats, setDevStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchDevData = useCallback(async () => {
+    if (!user?.is_developer) return;
+    try {
+      const [statsRes, usersRes] = await Promise.all([
+        axios.get(`${API}/developer/stats?authorization=${token}`),
+        axios.get(`${API}/admin/users?authorization=${token}`)
+      ]);
+      setDevStats(statsRes.data);
+      setUsers(usersRes.data.users || []);
+    } catch (error) {
+      console.error('Failed to fetch dev data:', error);
+    }
+  }, [token, user?.is_developer]);
+
+  useEffect(() => {
+    fetchDevData();
+  }, [fetchDevData]);
+
+  const claimDeveloper = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post(`${API}/developer/claim?authorization=${token}`, {
+        secret_code: secretCode
+      });
+      toast.success('Developer status granted! Refreshing...');
+      // Refresh user data
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Invalid secret code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setUserRole = async (userId, role) => {
+    try {
+      await axios.put(`${API}/developer/users/${userId}/set-role?role=${role}&authorization=${token}`);
+      toast.success(`Role set to ${role}`);
+      fetchDevData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to set role');
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user and all their data?')) return;
+    try {
+      await axios.delete(`${API}/developer/users/${userId}?authorization=${token}`);
+      toast.success('User deleted');
+      fetchDevData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete user');
+    }
+  };
+
+  const clearQueue = async () => {
+    if (!window.confirm('Are you sure you want to clear the entire queue?')) return;
+    try {
+      const res = await axios.delete(`${API}/developer/queue/clear?authorization=${token}`);
+      toast.success(res.data.message);
+      fetchDevData();
+    } catch (error) {
+      toast.error('Failed to clear queue');
+    }
+  };
+
+  // Not logged in
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Not a developer - show claim form
+  if (!user.is_developer) {
+    return (
+      <div className="min-h-screen pt-20 pb-20 px-4">
+        <div className="max-w-md mx-auto glass p-8">
+          <div className="text-center mb-6">
+            <Settings className="w-16 h-16 text-[#FF003C] mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-white uppercase tracking-tight">Developer Access</h1>
+            <p className="text-gray-400 mt-2">Enter the secret code to claim developer status</p>
+          </div>
+          <form onSubmit={claimDeveloper} className="space-y-4">
+            <input
+              type="password"
+              value={secretCode}
+              onChange={(e) => setSecretCode(e.target.value)}
+              placeholder="Enter secret code..."
+              className="terminal-input w-full text-white p-4 text-center font-mono tracking-widest"
+              data-testid="dev-secret-input"
+            />
+            <button
+              type="submit"
+              disabled={loading || !secretCode}
+              className="w-full py-4 bg-[#FF003C] text-white font-bold uppercase tracking-wider hover:bg-[#cc0030] transition-colors disabled:opacity-50"
+              data-testid="claim-dev-btn"
+            >
+              {loading ? 'Verifying...' : 'Claim Developer Access'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Developer panel
+  return (
+    <div className="min-h-screen pt-8 pb-20 px-4" data-testid="developer-panel">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <Settings className="w-10 h-10 text-[#FF003C]" />
+          <div>
+            <h1 className="text-4xl font-bold text-white uppercase tracking-tight">
+              Developer <span className="text-[#FF003C]">Console</span>
+            </h1>
+            <p className="text-gray-500 font-mono">Supreme access granted</p>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        {devStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="glass p-4 border-l-4 border-[#FF003C]">
+              <div className="text-3xl font-bold text-[#FF003C]">{devStats.users?.developers || 0}</div>
+              <div className="text-xs text-gray-500 uppercase">Developers</div>
+            </div>
+            <div className="glass p-4 border-l-4 border-[#39FF14]">
+              <div className="text-3xl font-bold text-[#39FF14]">{devStats.users?.admins || 0}</div>
+              <div className="text-xs text-gray-500 uppercase">Admins</div>
+            </div>
+            <div className="glass p-4 border-l-4 border-[#00F0FF]">
+              <div className="text-3xl font-bold text-[#00F0FF]">{devStats.users?.vips || 0}</div>
+              <div className="text-xs text-gray-500 uppercase">VIPs</div>
+            </div>
+            <div className="glass p-4 border-l-4 border-white">
+              <div className="text-3xl font-bold text-white">{devStats.users?.total || 0}</div>
+              <div className="text-xs text-gray-500 uppercase">Total Users</div>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Actions */}
+        <div className="glass p-6 mb-8">
+          <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-[#FF003C]" />
+            Danger Zone
+          </h2>
+          <div className="flex gap-4">
+            <button
+              onClick={clearQueue}
+              className="px-6 py-3 bg-[#FF003C]/10 border border-[#FF003C] text-[#FF003C] font-bold uppercase tracking-wider hover:bg-[#FF003C] hover:text-white transition-colors"
+              data-testid="clear-queue-btn"
+            >
+              Clear Entire Queue
+            </button>
+          </div>
+        </div>
+
+        {/* User Management */}
+        <div className="glass p-6">
+          <h2 className="text-xl font-bold text-white uppercase tracking-wide mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-[#FF003C]" />
+            User Role Management
+          </h2>
+          <div className="space-y-3">
+            {users.map((u) => (
+              <div key={u.id} className="flex items-center gap-4 p-4 bg-black/30 border border-white/5">
+                <img 
+                  src={u.avatar_url || 'https://via.placeholder.com/40'} 
+                  alt={u.username}
+                  className="w-12 h-12 rounded"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-bold">{u.username}</span>
+                    {u.is_developer && <span className="bg-[#FF003C]/20 text-[#FF003C] text-xs px-2 py-0.5">DEV</span>}
+                    {u.is_admin && !u.is_developer && <span className="bg-[#39FF14]/20 text-[#39FF14] text-xs px-2 py-0.5">ADMIN</span>}
+                    {u.is_vip && !u.is_admin && <span className="bg-[#00F0FF]/20 text-[#00F0FF] text-xs px-2 py-0.5">VIP</span>}
+                  </div>
+                  <div className="text-xs text-gray-500 font-mono">{u.steam_id}</div>
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    onChange={(e) => setUserRole(u.id, e.target.value)}
+                    className="bg-black/50 border border-white/10 text-white text-sm px-3 py-2"
+                    defaultValue=""
+                    data-testid={`role-select-${u.id}`}
+                  >
+                    <option value="" disabled>Set Role...</option>
+                    <option value="developer">Developer</option>
+                    <option value="admin">Admin</option>
+                    <option value="vip">VIP</option>
+                    <option value="regular">Regular</option>
+                  </select>
+                  {u.id !== user.id && (
+                    <button
+                      onClick={() => deleteUser(u.id)}
+                      className="px-3 py-2 bg-[#FF003C]/10 text-[#FF003C] hover:bg-[#FF003C] hover:text-white transition-colors"
+                      data-testid={`delete-user-${u.id}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function App() {
   return (
@@ -1232,6 +1456,7 @@ function App() {
             <Route path="/apply" element={<ApplyPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/developer" element={<DeveloperPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>
