@@ -127,6 +127,8 @@ const translations = {
     serverConnection: 'Server Connection',
     serverIP: 'FiveM Server IP',
     serverPort: 'Server Port',
+    cfxServerCode: 'CFX Server Code',
+    cfxServerCodeHelp: 'From cfx.re/join/CODE (e.g., jjxxla)',
     maxPlayers: 'Max Players',
     discordInvite: 'Discord Invite Link',
     primaryColor: 'Primary Color (Hex)',
@@ -137,6 +139,15 @@ const translations = {
     developerAccess: 'Developer Access',
     enterSecretCode: 'Enter the secret code to claim developer status',
     claimDeveloperAccess: 'Claim Developer Access',
+    applicationQuestions: 'Application Questions',
+    whitelistQuestions: 'Whitelist Questions',
+    jobQuestions: 'Job Questions',
+    addQuestion: 'Add Question',
+    removeQuestion: 'Remove',
+    questionLabel: 'Question Label',
+    questionType: 'Type',
+    required: 'Required',
+    placeholder: 'Placeholder',
   },
   sv: {
     // Navigation
@@ -251,6 +262,8 @@ const translations = {
     serverConnection: 'Serveranslutning',
     serverIP: 'FiveM Server IP',
     serverPort: 'Serverport',
+    cfxServerCode: 'CFX Serverkod',
+    cfxServerCodeHelp: 'Från cfx.re/join/KOD (t.ex. jjxxla)',
     maxPlayers: 'Max Spelare',
     discordInvite: 'Discord Inbjudningslänk',
     primaryColor: 'Primär Färg (Hex)',
@@ -261,6 +274,15 @@ const translations = {
     developerAccess: 'Utvecklaråtkomst',
     enterSecretCode: 'Ange den hemliga koden för att få utvecklarstatus',
     claimDeveloperAccess: 'Hämta Utvecklaråtkomst',
+    applicationQuestions: 'Ansökningsfrågor',
+    whitelistQuestions: 'Whitelist-frågor',
+    jobQuestions: 'Jobbfrågor',
+    addQuestion: 'Lägg till Fråga',
+    removeQuestion: 'Ta bort',
+    questionLabel: 'Frågetext',
+    questionType: 'Typ',
+    required: 'Obligatorisk',
+    placeholder: 'Platshållare',
   }
 };
 
@@ -830,17 +852,15 @@ const QueuePage = () => {
 // ==================== APPLY PAGE ====================
 const ApplyPage = () => {
   const { user, token, login } = useAuth();
+  const { settings, t } = useSettings();
   const [activeTab, setActiveTab] = useState('whitelist');
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    discord_username: '',
-    in_game_hours: '',
-    roleplay_experience: '',
-    character_backstory: '',
-    why_join: '',
-    previous_servers: '',
-    job_type: ''
-  });
+  const [formData, setFormData] = useState({});
+
+  // Get questions from settings
+  const questions = activeTab === 'whitelist' 
+    ? (settings.whitelist_questions || [])
+    : (settings.job_questions || []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -854,26 +874,27 @@ const ApplyPage = () => {
     }
     setLoading(true);
     try {
+      // Build answers object from form data
+      const answers = {};
+      questions.forEach(q => {
+        answers[q.id] = formData[q.id] || '';
+      });
+
       await axios.post(`${API}/applications?authorization=${token}`, {
         application_type: activeTab,
         job_type: activeTab === 'job' ? formData.job_type : null,
-        discord_username: formData.discord_username,
-        in_game_hours: parseInt(formData.in_game_hours) || 0,
-        roleplay_experience: formData.roleplay_experience,
-        character_backstory: formData.character_backstory,
-        why_join: formData.why_join,
-        previous_servers: formData.previous_servers || null
+        // Legacy fields for backwards compatibility
+        discord_username: formData.discord || '',
+        in_game_hours: parseInt(formData.hours) || 0,
+        roleplay_experience: formData.experience || '',
+        character_backstory: formData.backstory || '',
+        why_join: formData.why_join || formData.why_this_job || '',
+        previous_servers: formData.previous_servers || null,
+        // All answers as JSON
+        custom_answers: answers
       });
-      toast.success('Application submitted successfully!');
-      setFormData({
-        discord_username: '',
-        in_game_hours: '',
-        roleplay_experience: '',
-        character_backstory: '',
-        why_join: '',
-        previous_servers: '',
-        job_type: ''
-      });
+      toast.success(t('submitApplication') + ' - Success!');
+      setFormData({});
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to submit application');
     } finally {
@@ -886,10 +907,10 @@ const ApplyPage = () => {
       <div className="min-h-screen pt-20 pb-20 px-4">
         <div className="max-w-2xl mx-auto glass p-8 text-center">
           <Shield className="w-16 h-16 text-[#39FF14] mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-white uppercase tracking-tight mb-4">Apply Now</h1>
-          <p className="text-gray-400 mb-6">Login with Steam to submit your application</p>
+          <h1 className="text-3xl font-bold text-white uppercase tracking-tight mb-4">{t('applyNow')}</h1>
+          <p className="text-gray-400 mb-6">{t('loginToApply')}</p>
           <button onClick={login} className="btn-steam px-6 py-3" data-testid="apply-login-btn">
-            Login with Steam
+            {t('loginWithSteam')}
           </button>
         </div>
       </div>
@@ -900,13 +921,13 @@ const ApplyPage = () => {
     <div className="min-h-screen pt-8 pb-20 px-4">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-4xl font-bold text-white uppercase tracking-tight mb-8 text-center">
-          Submit <span className="text-[#39FF14]">Application</span>
+          {t('submitApplication').split(' ')[0]} <span className="text-[#39FF14]">{t('submitApplication').split(' ').slice(1).join(' ')}</span>
         </h1>
 
         {/* Tabs */}
         <div className="flex mb-8 border-b border-white/10">
           <button
-            onClick={() => setActiveTab('whitelist')}
+            onClick={() => { setActiveTab('whitelist'); setFormData({}); }}
             className={`flex-1 py-4 text-center font-bold uppercase tracking-wider transition-colors ${
               activeTab === 'whitelist' 
                 ? 'text-[#39FF14] border-b-2 border-[#39FF14]' 
@@ -915,10 +936,10 @@ const ApplyPage = () => {
             data-testid="whitelist-tab"
           >
             <Shield className="w-5 h-5 inline mr-2" />
-            Whitelist
+            {t('whitelist')}
           </button>
           <button
-            onClick={() => setActiveTab('job')}
+            onClick={() => { setActiveTab('job'); setFormData({}); }}
             className={`flex-1 py-4 text-center font-bold uppercase tracking-wider transition-colors ${
               activeTab === 'job' 
                 ? 'text-[#39FF14] border-b-2 border-[#39FF14]' 
@@ -927,7 +948,7 @@ const ApplyPage = () => {
             data-testid="job-tab"
           >
             <Briefcase className="w-5 h-5 inline mr-2" />
-            Job Application
+            {t('jobApplication')}
           </button>
         </div>
 
@@ -936,121 +957,69 @@ const ApplyPage = () => {
           {activeTab === 'job' && (
             <div>
               <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                Job Type *
+                {t('jobType')} *
               </label>
               <select
                 name="job_type"
-                value={formData.job_type}
+                value={formData.job_type || ''}
                 onChange={handleChange}
                 required
                 className="w-full bg-black/50 border border-white/10 text-white p-3 focus:border-[#39FF14] outline-none"
                 data-testid="job-type-select"
               >
-                <option value="">Select a job...</option>
-                <option value="police">Police Department</option>
-                <option value="ems">Emergency Medical Services</option>
-                <option value="mechanic">Mechanic</option>
-                <option value="taxi">Taxi Driver</option>
-                <option value="lawyer">Lawyer</option>
-                <option value="real_estate">Real Estate Agent</option>
+                <option value="">{t('selectJob')}</option>
+                <option value="police">{t('police')}</option>
+                <option value="ems">{t('ems')}</option>
+                <option value="mechanic">{t('mechanic')}</option>
+                <option value="taxi">{t('taxi')}</option>
+                <option value="lawyer">{t('lawyer')}</option>
+                <option value="real_estate">{t('realEstate')}</option>
               </select>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-              Discord Username *
-            </label>
-            <input
-              type="text"
-              name="discord_username"
-              value={formData.discord_username}
-              onChange={handleChange}
-              required
-              placeholder="e.g., username#1234"
-              className="terminal-input w-full text-white p-3"
-              data-testid="discord-input"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-              In-Game Hours *
-            </label>
-            <input
-              type="number"
-              name="in_game_hours"
-              value={formData.in_game_hours}
-              onChange={handleChange}
-              required
-              placeholder="Total hours in GTA V/FiveM"
-              className="terminal-input w-full text-white p-3"
-              data-testid="hours-input"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-              Roleplay Experience *
-            </label>
-            <textarea
-              name="roleplay_experience"
-              value={formData.roleplay_experience}
-              onChange={handleChange}
-              required
-              rows={4}
-              placeholder="Describe your previous roleplay experience..."
-              className="terminal-input w-full text-white p-3 resize-none"
-              data-testid="experience-textarea"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-              Character Backstory *
-            </label>
-            <textarea
-              name="character_backstory"
-              value={formData.character_backstory}
-              onChange={handleChange}
-              required
-              rows={6}
-              placeholder="Tell us about your character's background, motivations, and goals..."
-              className="terminal-input w-full text-white p-3 resize-none"
-              data-testid="backstory-textarea"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-              Why Do You Want to Join? *
-            </label>
-            <textarea
-              name="why_join"
-              value={formData.why_join}
-              onChange={handleChange}
-              required
-              rows={4}
-              placeholder="What attracts you to our server?"
-              className="terminal-input w-full text-white p-3 resize-none"
-              data-testid="why-join-textarea"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-              Previous Servers (Optional)
-            </label>
-            <input
-              type="text"
-              name="previous_servers"
-              value={formData.previous_servers}
-              onChange={handleChange}
-              placeholder="List any previous FiveM servers you've played on"
-              className="terminal-input w-full text-white p-3"
-              data-testid="servers-input"
-            />
-          </div>
+          {/* Dynamic Questions */}
+          {questions.map((q, idx) => (
+            <div key={q.id || idx}>
+              <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                {q.label} {q.required && '*'}
+              </label>
+              {q.type === 'textarea' ? (
+                <textarea
+                  name={q.id}
+                  value={formData[q.id] || ''}
+                  onChange={handleChange}
+                  required={q.required}
+                  rows={4}
+                  placeholder={q.placeholder || ''}
+                  className="terminal-input w-full text-white p-3 resize-none"
+                  data-testid={`input-${q.id}`}
+                />
+              ) : q.type === 'number' ? (
+                <input
+                  type="number"
+                  name={q.id}
+                  value={formData[q.id] || ''}
+                  onChange={handleChange}
+                  required={q.required}
+                  placeholder={q.placeholder || ''}
+                  className="terminal-input w-full text-white p-3"
+                  data-testid={`input-${q.id}`}
+                />
+              ) : (
+                <input
+                  type="text"
+                  name={q.id}
+                  value={formData[q.id] || ''}
+                  onChange={handleChange}
+                  required={q.required}
+                  placeholder={q.placeholder || ''}
+                  className="terminal-input w-full text-white p-3"
+                  data-testid={`input-${q.id}`}
+                />
+              )}
+            </div>
+          ))}
 
           <button
             type="submit"
@@ -1058,7 +1027,7 @@ const ApplyPage = () => {
             className="btn-primary w-full py-4 text-lg"
             data-testid="submit-application-btn"
           >
-            {loading ? 'Submitting...' : 'Submit Application'}
+            {loading ? 'Submitting...' : t('submitApplicationBtn')}
           </button>
         </form>
       </div>
@@ -2034,10 +2003,24 @@ const DeveloperPage = () => {
             </div>
 
             <h3 className="text-lg font-bold text-white uppercase tracking-wide pt-4 border-t border-white/10">{t('serverConnection')}</h3>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
+                  {t('cfxServerCode')} <span className="text-[#39FF14]">(Recommended)</span>
+                </label>
+                <input
+                  type="text"
+                  value={settings.cfx_server_code || ''}
+                  onChange={(e) => setSettings({...settings, cfx_server_code: e.target.value})}
+                  placeholder="jjxxla"
+                  className="terminal-input w-full text-white p-3"
+                  data-testid="cfx-code-input"
+                />
+                <p className="text-xs text-gray-500 mt-1">{t('cfxServerCodeHelp')}</p>
+              </div>
               <div>
                 <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  {t('serverIP')}
+                  {t('serverIP')} <span className="text-gray-600">(Optional fallback)</span>
                 </label>
                 <input
                   type="text"
@@ -2059,19 +2042,6 @@ const DeveloperPage = () => {
                   placeholder="30120"
                   className="terminal-input w-full text-white p-3"
                   data-testid="server-port-input"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-mono text-gray-400 uppercase tracking-wider mb-2">
-                  {t('maxPlayers')}
-                </label>
-                <input
-                  type="number"
-                  value={settings.max_players || ''}
-                  onChange={(e) => setSettings({...settings, max_players: parseInt(e.target.value) || 64})}
-                  placeholder="64"
-                  className="terminal-input w-full text-white p-3"
-                  data-testid="max-players-input"
                 />
               </div>
             </div>
@@ -2107,6 +2077,183 @@ const DeveloperPage = () => {
                   className="w-12 h-12 border border-white/20"
                   style={{backgroundColor: settings.primary_color || '#39FF14'}}
                 />
+              </div>
+            </div>
+
+            {/* Application Questions Editor */}
+            <h3 className="text-lg font-bold text-white uppercase tracking-wide pt-4 border-t border-white/10">{t('applicationQuestions')}</h3>
+            
+            {/* Whitelist Questions */}
+            <div className="bg-black/30 p-4 border border-white/10">
+              <h4 className="text-md font-bold text-[#39FF14] uppercase mb-4">{t('whitelistQuestions')}</h4>
+              <div className="space-y-3">
+                {(settings.whitelist_questions || []).map((q, idx) => (
+                  <div key={idx} className="flex gap-3 items-start bg-black/30 p-3 border border-white/5">
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <input
+                        type="text"
+                        value={q.label || ''}
+                        onChange={(e) => {
+                          const newQ = [...(settings.whitelist_questions || [])];
+                          newQ[idx] = {...newQ[idx], label: e.target.value};
+                          setSettings({...settings, whitelist_questions: newQ});
+                        }}
+                        placeholder={t('questionLabel')}
+                        className="terminal-input text-white p-2 text-sm"
+                      />
+                      <select
+                        value={q.type || 'text'}
+                        onChange={(e) => {
+                          const newQ = [...(settings.whitelist_questions || [])];
+                          newQ[idx] = {...newQ[idx], type: e.target.value};
+                          setSettings({...settings, whitelist_questions: newQ});
+                        }}
+                        className="bg-black/50 border border-white/10 text-white p-2 text-sm"
+                      >
+                        <option value="text">Text</option>
+                        <option value="textarea">Textarea</option>
+                        <option value="number">Number</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={q.placeholder || ''}
+                        onChange={(e) => {
+                          const newQ = [...(settings.whitelist_questions || [])];
+                          newQ[idx] = {...newQ[idx], placeholder: e.target.value};
+                          setSettings({...settings, whitelist_questions: newQ});
+                        }}
+                        placeholder={t('placeholder')}
+                        className="terminal-input text-white p-2 text-sm"
+                      />
+                      <label className="flex items-center gap-2 text-sm text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={q.required || false}
+                          onChange={(e) => {
+                            const newQ = [...(settings.whitelist_questions || [])];
+                            newQ[idx] = {...newQ[idx], required: e.target.checked};
+                            setSettings({...settings, whitelist_questions: newQ});
+                          }}
+                          className="w-4 h-4"
+                        />
+                        {t('required')}
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newQ = (settings.whitelist_questions || []).filter((_, i) => i !== idx);
+                        setSettings({...settings, whitelist_questions: newQ});
+                      }}
+                      className="px-3 py-2 bg-[#FF003C]/10 text-[#FF003C] text-xs hover:bg-[#FF003C] hover:text-white"
+                    >
+                      {t('removeQuestion')}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newQ = [...(settings.whitelist_questions || []), {
+                      id: `q_${Date.now()}`,
+                      label: '',
+                      type: 'text',
+                      required: false,
+                      placeholder: ''
+                    }];
+                    setSettings({...settings, whitelist_questions: newQ});
+                  }}
+                  className="px-4 py-2 bg-[#39FF14]/10 text-[#39FF14] text-sm hover:bg-[#39FF14]/20"
+                >
+                  + {t('addQuestion')}
+                </button>
+              </div>
+            </div>
+
+            {/* Job Questions */}
+            <div className="bg-black/30 p-4 border border-white/10">
+              <h4 className="text-md font-bold text-[#00F0FF] uppercase mb-4">{t('jobQuestions')}</h4>
+              <div className="space-y-3">
+                {(settings.job_questions || []).map((q, idx) => (
+                  <div key={idx} className="flex gap-3 items-start bg-black/30 p-3 border border-white/5">
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <input
+                        type="text"
+                        value={q.label || ''}
+                        onChange={(e) => {
+                          const newQ = [...(settings.job_questions || [])];
+                          newQ[idx] = {...newQ[idx], label: e.target.value};
+                          setSettings({...settings, job_questions: newQ});
+                        }}
+                        placeholder={t('questionLabel')}
+                        className="terminal-input text-white p-2 text-sm"
+                      />
+                      <select
+                        value={q.type || 'text'}
+                        onChange={(e) => {
+                          const newQ = [...(settings.job_questions || [])];
+                          newQ[idx] = {...newQ[idx], type: e.target.value};
+                          setSettings({...settings, job_questions: newQ});
+                        }}
+                        className="bg-black/50 border border-white/10 text-white p-2 text-sm"
+                      >
+                        <option value="text">Text</option>
+                        <option value="textarea">Textarea</option>
+                        <option value="number">Number</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={q.placeholder || ''}
+                        onChange={(e) => {
+                          const newQ = [...(settings.job_questions || [])];
+                          newQ[idx] = {...newQ[idx], placeholder: e.target.value};
+                          setSettings({...settings, job_questions: newQ});
+                        }}
+                        placeholder={t('placeholder')}
+                        className="terminal-input text-white p-2 text-sm"
+                      />
+                      <label className="flex items-center gap-2 text-sm text-gray-400">
+                        <input
+                          type="checkbox"
+                          checked={q.required || false}
+                          onChange={(e) => {
+                            const newQ = [...(settings.job_questions || [])];
+                            newQ[idx] = {...newQ[idx], required: e.target.checked};
+                            setSettings({...settings, job_questions: newQ});
+                          }}
+                          className="w-4 h-4"
+                        />
+                        {t('required')}
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newQ = (settings.job_questions || []).filter((_, i) => i !== idx);
+                        setSettings({...settings, job_questions: newQ});
+                      }}
+                      className="px-3 py-2 bg-[#FF003C]/10 text-[#FF003C] text-xs hover:bg-[#FF003C] hover:text-white"
+                    >
+                      {t('removeQuestion')}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newQ = [...(settings.job_questions || []), {
+                      id: `q_${Date.now()}`,
+                      label: '',
+                      type: 'text',
+                      required: false,
+                      placeholder: ''
+                    }];
+                    setSettings({...settings, job_questions: newQ});
+                  }}
+                  className="px-4 py-2 bg-[#00F0FF]/10 text-[#00F0FF] text-sm hover:bg-[#00F0FF]/20"
+                >
+                  + {t('addQuestion')}
+                </button>
               </div>
             </div>
 

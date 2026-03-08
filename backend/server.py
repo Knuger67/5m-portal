@@ -67,10 +67,27 @@ class SiteSettings(BaseModel):
     hero_subtitle: str = "Join the ultimate GTA V roleplay experience. Apply for whitelist, queue to join, and become part of our community."
     fivem_server_ip: str = ""
     fivem_server_port: str = "30120"
+    cfx_server_code: str = ""  # e.g., "jjxxla" from cfx.re/join/jjxxla
     discord_invite: str = ""
     max_players: int = 64
     primary_color: str = "#39FF14"
     language: str = "en"  # en or sv
+    # Custom application questions
+    whitelist_questions: List[dict] = Field(default_factory=lambda: [
+        {"id": "discord", "label": "Discord Username", "type": "text", "required": True, "placeholder": "e.g., username#1234"},
+        {"id": "hours", "label": "In-Game Hours", "type": "number", "required": True, "placeholder": "Total hours in GTA V/FiveM"},
+        {"id": "experience", "label": "Roleplay Experience", "type": "textarea", "required": True, "placeholder": "Describe your previous roleplay experience..."},
+        {"id": "backstory", "label": "Character Backstory", "type": "textarea", "required": True, "placeholder": "Tell us about your character's background..."},
+        {"id": "why_join", "label": "Why Do You Want to Join?", "type": "textarea", "required": True, "placeholder": "What attracts you to our server?"},
+        {"id": "previous_servers", "label": "Previous Servers", "type": "text", "required": False, "placeholder": "List any previous FiveM servers"}
+    ])
+    job_questions: List[dict] = Field(default_factory=lambda: [
+        {"id": "discord", "label": "Discord Username", "type": "text", "required": True, "placeholder": "e.g., username#1234"},
+        {"id": "hours", "label": "In-Game Hours", "type": "number", "required": True, "placeholder": "Total hours in GTA V/FiveM"},
+        {"id": "experience", "label": "Job Experience", "type": "textarea", "required": True, "placeholder": "Describe your experience with this job role..."},
+        {"id": "why_this_job", "label": "Why This Job?", "type": "textarea", "required": True, "placeholder": "Why do you want this specific job?"},
+        {"id": "availability", "label": "Availability", "type": "text", "required": True, "placeholder": "When are you usually online?"}
+    ])
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class QueueEntry(BaseModel):
@@ -100,6 +117,7 @@ class Application(BaseModel):
     character_backstory: str
     why_join: str
     previous_servers: Optional[str] = None
+    custom_answers: Optional[dict] = None  # Store all custom question answers
     status: str = "pending"  # pending, approved, denied
     admin_notes: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -118,12 +136,13 @@ class ServerStatus(BaseModel):
 class ApplicationCreate(BaseModel):
     application_type: str
     job_type: Optional[str] = None
-    discord_username: str
-    in_game_hours: int
-    roleplay_experience: str
-    character_backstory: str
-    why_join: str
+    discord_username: str = ""
+    in_game_hours: int = 0
+    roleplay_experience: str = ""
+    character_backstory: str = ""
+    why_join: str = ""
     previous_servers: Optional[str] = None
+    custom_answers: Optional[dict] = None
 
 class ApplicationReview(BaseModel):
     status: str  # approved, denied
@@ -139,10 +158,13 @@ class SiteSettingsUpdate(BaseModel):
     hero_subtitle: Optional[str] = None
     fivem_server_ip: Optional[str] = None
     fivem_server_port: Optional[str] = None
+    cfx_server_code: Optional[str] = None
     discord_invite: Optional[str] = None
     max_players: Optional[int] = None
     primary_color: Optional[str] = None
     language: Optional[str] = None
+    whitelist_questions: Optional[List[dict]] = None
+    job_questions: Optional[List[dict]] = None
 
 class BanUserRequest(BaseModel):
     reason: str
@@ -337,16 +359,42 @@ async def get_server_status():
     max_players = settings.get("max_players", 64) if settings else 64
     server_ip = settings.get("fivem_server_ip", "") if settings else ""
     server_port = settings.get("fivem_server_port", "30120") if settings else "30120"
+    cfx_code = settings.get("cfx_server_code", "") if settings else ""
     
     # Default values
     players_online = 0
     is_online = False
+    player_list = []
     
-    # Try to fetch real data from FiveM server
-    if server_ip:
-        try:
-            async with httpx.AsyncClient() as client_http:
-                # Try to get player count from players.json
+    async with httpx.AsyncClient() as client_http:
+        # Method 1: Try cfx.re server code first (most reliable)
+        if cfx_code:
+            try:
+                # FiveM servers API
+                api_url = f"https://servers-frontend.fivem.net/api/servers/single/{cfx_code}"
+                response = await client_http.get(api_url, timeout=10.0, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                })
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "Data" in data:
+                        server_data = data["Data"]
+                        players_online = server_data.get("clients", 0)
+                        max_players = server_data.get("sv_maxclients", max_players)
+                        is_online = True
+                        
+                        # Get player names if available
+                        if "players" in server_data:
+                            player_list = [p.get("name", "Unknown") for p in server_data["players"]]
+                        
+                        logger.info(f"CFX API: {players_online}/{max_players} players online")
+            except Exception as e:
+                logger.warning(f"CFX API failed: {e}")
+        
+        # Method 2: Try direct IP if cfx didn't work
+        if not is_online and server_ip:
+            try:
                 players_url = f"http://{server_ip}:{server_port}/players.json"
                 response = await client_http.get(players_url, timeout=5.0)
                 
@@ -354,23 +402,21 @@ async def get_server_status():
                     players_data = response.json()
                     players_online = len(players_data) if isinstance(players_data, list) else 0
                     is_online = True
+                    player_list = [p.get("name", "Unknown") for p in players_data] if isinstance(players_data, list) else []
                     
-                # Try to get server info from info.json for max players
+                # Try to get server info for max players
                 try:
                     info_url = f"http://{server_ip}:{server_port}/info.json"
                     info_response = await client_http.get(info_url, timeout=5.0)
                     if info_response.status_code == 200:
                         info_data = info_response.json()
-                        # FiveM returns sv_maxClients in vars
                         if "vars" in info_data and "sv_maxClients" in info_data["vars"]:
                             max_players = int(info_data["vars"]["sv_maxClients"])
                 except Exception:
-                    pass  # Use configured max_players if info.json fails
+                    pass
                     
-        except Exception as e:
-            logger.warning(f"Failed to fetch FiveM server status: {e}")
-            is_online = False
-            players_online = 0
+            except Exception as e:
+                logger.warning(f"Direct IP failed: {e}")
     
     return {
         "online": is_online,
@@ -379,7 +425,9 @@ async def get_server_status():
         "queue_length": queue_count,
         "server_name": server_name,
         "server_ip": server_ip,
-        "server_port": server_port
+        "server_port": server_port,
+        "cfx_code": cfx_code,
+        "player_list": player_list[:20]  # Limit to 20 players for display
     }
 
 # ==================== SITE SETTINGS ====================
@@ -551,7 +599,8 @@ async def create_application(data: ApplicationCreate, authorization: str = Query
         roleplay_experience=data.roleplay_experience,
         character_backstory=data.character_backstory,
         why_join=data.why_join,
-        previous_servers=data.previous_servers
+        previous_servers=data.previous_servers,
+        custom_answers=data.custom_answers
     )
     
     app_dict = application.model_dump()
@@ -1055,34 +1104,40 @@ async def get_stats():
     settings = await db.settings.find_one({"id": "site_settings"}, {"_id": 0})
     server_ip = settings.get("fivem_server_ip", "") if settings else ""
     server_port = settings.get("fivem_server_port", "30120") if settings else "30120"
+    cfx_code = settings.get("cfx_server_code", "") if settings else ""
     max_players = settings.get("max_players", 64) if settings else 64
     
     # Default values
     players_online = 0
     
-    # Try to fetch real player count from FiveM server
-    if server_ip:
-        try:
-            async with httpx.AsyncClient() as client_http:
+    async with httpx.AsyncClient() as client_http:
+        # Try cfx.re API first
+        if cfx_code:
+            try:
+                api_url = f"https://servers-frontend.fivem.net/api/servers/single/{cfx_code}"
+                response = await client_http.get(api_url, timeout=10.0, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                })
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "Data" in data:
+                        players_online = data["Data"].get("clients", 0)
+                        max_players = data["Data"].get("sv_maxclients", max_players)
+            except Exception as e:
+                logger.warning(f"CFX stats API failed: {e}")
+        
+        # Fallback to direct IP
+        if players_online == 0 and server_ip:
+            try:
                 players_url = f"http://{server_ip}:{server_port}/players.json"
                 response = await client_http.get(players_url, timeout=5.0)
                 
                 if response.status_code == 200:
                     players_data = response.json()
                     players_online = len(players_data) if isinstance(players_data, list) else 0
-                    
-                # Try to get max players from server
-                try:
-                    info_url = f"http://{server_ip}:{server_port}/info.json"
-                    info_response = await client_http.get(info_url, timeout=5.0)
-                    if info_response.status_code == 200:
-                        info_data = info_response.json()
-                        if "vars" in info_data and "sv_maxClients" in info_data["vars"]:
-                            max_players = int(info_data["vars"]["sv_maxClients"])
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.warning(f"Failed to fetch FiveM stats: {e}")
+            except Exception as e:
+                logger.warning(f"Direct IP stats failed: {e}")
     
     return {
         "total_users": user_count,
