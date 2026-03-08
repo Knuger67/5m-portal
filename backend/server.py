@@ -327,21 +327,60 @@ async def logout():
 
 # ==================== SERVER STATUS ====================
 
-@api_router.get("/server/status", response_model=ServerStatus)
+@api_router.get("/server/status")
 async def get_server_status():
-    """Get current server status"""
+    """Get current server status - fetches real data from FiveM server"""
     queue_count = await db.queue.count_documents({})
     settings = await db.settings.find_one({"id": "site_settings"}, {"_id": 0})
+    
     server_name = settings.get("server_name", "FiveM Roleplay Server") if settings else "FiveM Roleplay Server"
     max_players = settings.get("max_players", 64) if settings else 64
+    server_ip = settings.get("fivem_server_ip", "") if settings else ""
+    server_port = settings.get("fivem_server_port", "30120") if settings else "30120"
     
-    return ServerStatus(
-        online=True,
-        players_online=42,
-        max_players=max_players,
-        queue_length=queue_count,
-        server_name=server_name
-    )
+    # Default values
+    players_online = 0
+    is_online = False
+    
+    # Try to fetch real data from FiveM server
+    if server_ip:
+        try:
+            async with httpx.AsyncClient() as client_http:
+                # Try to get player count from players.json
+                players_url = f"http://{server_ip}:{server_port}/players.json"
+                response = await client_http.get(players_url, timeout=5.0)
+                
+                if response.status_code == 200:
+                    players_data = response.json()
+                    players_online = len(players_data) if isinstance(players_data, list) else 0
+                    is_online = True
+                    
+                # Try to get server info from info.json for max players
+                try:
+                    info_url = f"http://{server_ip}:{server_port}/info.json"
+                    info_response = await client_http.get(info_url, timeout=5.0)
+                    if info_response.status_code == 200:
+                        info_data = info_response.json()
+                        # FiveM returns sv_maxClients in vars
+                        if "vars" in info_data and "sv_maxClients" in info_data["vars"]:
+                            max_players = int(info_data["vars"]["sv_maxClients"])
+                except Exception:
+                    pass  # Use configured max_players if info.json fails
+                    
+        except Exception as e:
+            logger.warning(f"Failed to fetch FiveM server status: {e}")
+            is_online = False
+            players_online = 0
+    
+    return {
+        "online": is_online,
+        "players_online": players_online,
+        "max_players": max_players,
+        "queue_length": queue_count,
+        "server_name": server_name,
+        "server_ip": server_ip,
+        "server_port": server_port
+    }
 
 # ==================== SITE SETTINGS ====================
 
@@ -1012,12 +1051,45 @@ async def get_stats():
     queue_count = await db.queue.count_documents({})
     pending_apps = await db.applications.count_documents({"status": "pending"})
     
+    # Get settings for server info
+    settings = await db.settings.find_one({"id": "site_settings"}, {"_id": 0})
+    server_ip = settings.get("fivem_server_ip", "") if settings else ""
+    server_port = settings.get("fivem_server_port", "30120") if settings else "30120"
+    max_players = settings.get("max_players", 64) if settings else 64
+    
+    # Default values
+    players_online = 0
+    
+    # Try to fetch real player count from FiveM server
+    if server_ip:
+        try:
+            async with httpx.AsyncClient() as client_http:
+                players_url = f"http://{server_ip}:{server_port}/players.json"
+                response = await client_http.get(players_url, timeout=5.0)
+                
+                if response.status_code == 200:
+                    players_data = response.json()
+                    players_online = len(players_data) if isinstance(players_data, list) else 0
+                    
+                # Try to get max players from server
+                try:
+                    info_url = f"http://{server_ip}:{server_port}/info.json"
+                    info_response = await client_http.get(info_url, timeout=5.0)
+                    if info_response.status_code == 200:
+                        info_data = info_response.json()
+                        if "vars" in info_data and "sv_maxClients" in info_data["vars"]:
+                            max_players = int(info_data["vars"]["sv_maxClients"])
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"Failed to fetch FiveM stats: {e}")
+    
     return {
         "total_users": user_count,
         "queue_length": queue_count,
         "pending_applications": pending_apps,
-        "players_online": 42,
-        "max_players": 64
+        "players_online": players_online,
+        "max_players": max_players
     }
 
 # Root endpoint
